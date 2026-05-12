@@ -1,0 +1,71 @@
+<?php
+
+
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
+
+Route::post('/login', [AuthController::class, 'login']);
+Route::middleware('jwt.auth')->get('/dashboard', [AuthController::class, 'dashboard']);
+
+Route::middleware(['jwt.auth'])->group(function () {
+    // Diligences Routes
+    Route::get('/getAlldiligences', [AuthController::class, 'getAlldiligences']);
+    Route::get('/diligences/{id}', [AuthController::class, 'diligencesShow']);
+    Route::post('/diligences/{diligenceId}/requests', [AuthController::class, 'diligencesRequests']); // Supposant que c'est pour mettre à jour une diligence
+
+    // Documents Routes
+    Route::get('/documents', [AuthController::class, 'documents']);
+    Route::get('/documents/{documentId}/download', [AuthController::class, 'documentsDownload']);
+
+    // Services Routes
+    Route::get('/services', [AuthController::class, 'services']);
+    Route::post('/services/{serviceId}/subscribe', [AuthController::class, 'servicesSubscribe']);
+
+    // Dashboard Routes
+    Route::get('/dashboard/cptedilis/{id}', [AuthController::class, 'cptedilis']);
+    Route::get('/dashboard/cptedocs/{id}', [AuthController::class, 'cptedocs']);
+    Route::get('/dashboard/cptereqs/{id}', [AuthController::class, 'cptereqs']);
+    Route::get('/dashboard/summary', [AuthController::class, 'summary']);
+    Route::get('/dashboard/honoraires/{id}', [AuthController::class, 'honoraires']);
+    Route::get('/dashboard/situationsFiscal/{id}', [AuthController::class, 'situationsFiscal']);
+    Route::get('/dashboard/situationsSocial/{id}', [AuthController::class, 'situationsSocial']);
+    Route::get('/dashboard/invoices', [AuthController::class, 'getInvoices']);
+
+    // User Info Route
+    Route::get('/compte/userInfos', [AuthController::class, 'userInfos']);
+    Route::post('/compte/change-password', [AuthController::class, 'changePassword']);
+
+    // User Info Situations
+    Route::get('/situations/fiscale', [AuthController::class, 'getFiscalSituation']);
+    Route::get('/situations/sociale', [AuthController::class, 'getSocialSituation']);
+
+    // Requests route
+    Route::get('/customer-requests', [AuthController::class, 'indexRequest']); // route ok
+    Route::post('/customer-requests/storeRequest', [AuthController::class, 'storeRequest']);
+    Route::put('/customer-requests/{id}', [AuthController::class, 'updateRequest']);
+
+    // route notification
+    Route::get('/notifications/indexNotification', [AuthController::class, 'indexNotification']);
+    Route::get('/notifications/unread-count', [AuthController::class, 'unreadCount']);
+    Route::post('/notifications/mark-as-read', [AuthController::class, 'markAsRead']);
+    Route::post('/notifications/mark-all-as-read', [AuthController::class, 'markAllAsRead']);
+});
+
+
+use App\Http\Controllers\Api\AuthController as ApiAuthController;
+use Illuminate\Http\Request;
+
+// Route publique (pas besoin de token)
+Route::post('/login', [ApiAuthController::class, 'login']);
+Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'apiIndex']);
+
+// Routes protégées (nécessitent un token valide)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/user', function (Request $request) {
+        return $request->user();
+    });
+
+    Route::post('/logout', [ApiAuthController::class, 'logout']);
+
+    // Ajoute tes autres routes ici (ex: listes de tâches, clients, etc.)
+});
