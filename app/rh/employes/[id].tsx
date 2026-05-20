@@ -1,8 +1,10 @@
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, Linking } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, Linking, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
+import { useState, useEffect } from 'react';
+import api from '@/services/api-service';
 
 export default function EmployeeDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -10,25 +12,62 @@ export default function EmployeeDetailScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const themeColors = Colors[colorScheme];
 
-  // Données fictives basées sur l'ID (Simulation)
-  const employee = {
-    id,
-    name: 'AGNIMEL MELEDJE ABRAHAM',
-    role: 'Comptable Senior',
-    dept: 'Assistance Comptable',
-    email: 'abraham.agnimel@dc-knowing.com',
-    phone: '+225 0777183932',
-    avatar: 'https://www.gravatar.com/avatar/aef99e65807ba7884bf13a747762fdba.png?s=400&d=mp',
-    joiningDate: '12 Janvier 2022',
-    reportingTo: 'Diallo Tidiane',
-    location: 'Abidjan, Côte d\'Ivoire',
-    projectsCount: 12,
-    tasksCount: 45,
+  const [employee, setEmployee] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchEmployee();
+  }, [id]);
+
+  const fetchEmployee = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await api.get(`/employees/${id}`);
+      setEmployee(response.data);
+    } catch (err: any) {
+      console.error('Erreur détail employé:', err);
+      setError('Impossible de charger les détails de cet employé.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCall = () => Linking.openURL(`tel:${employee.phone}`);
-  const handleWhatsApp = () => Linking.openURL(`whatsapp://send?phone=${employee.phone}`);
-  const handleEmail = () => Linking.openURL(`mailto:${employee.email}`);
+  const handleCall = () => {
+    if (employee?.mobile) Linking.openURL(`tel:${employee.mobile}`);
+  };
+  const handleWhatsApp = () => {
+    if (employee?.mobile) Linking.openURL(`whatsapp://send?phone=${employee.mobile}`);
+  };
+  const handleEmail = () => {
+    if (employee?.email) Linking.openURL(`mailto:${employee.email}`);
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: themeColors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#FFCC00" />
+        <Text style={{ color: themeColors.text, marginTop: 15, fontSize: 15, fontWeight: '600' }}>Chargement...</Text>
+      </View>
+    );
+  }
+
+  if (error || !employee) {
+    return (
+      <View style={[styles.container, { backgroundColor: themeColors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <Ionicons name="alert-circle-outline" size={60} color="#e74c3c" />
+        <Text style={{ color: themeColors.text, marginTop: 15, fontSize: 16, fontWeight: '700', textAlign: 'center', paddingHorizontal: 40 }}>
+          {error || 'Employé introuvable'}
+        </Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20, paddingVertical: 12, paddingHorizontal: 30, backgroundColor: '#FFCC00', borderRadius: 15 }}>
+          <Text style={{ fontWeight: '800', color: '#000' }}>Retour</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const avatarUrl = employee.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(employee.name)}&background=random&size=400`;
 
   return (
     <View style={[styles.container, { backgroundColor: themeColors.background }]}>
@@ -36,7 +75,7 @@ export default function EmployeeDetailScreen() {
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <Image 
-            source={{ uri: employee.avatar }} 
+            source={{ uri: avatarUrl }} 
             style={styles.headerBg}
             blurRadius={10}
           />
@@ -46,29 +85,31 @@ export default function EmployeeDetailScreen() {
             </TouchableOpacity>
             
             <View style={styles.avatarWrapper}>
-              <Image source={{ uri: employee.avatar }} style={styles.mainAvatar} />
-              <View style={styles.statusOnline} />
+              <Image source={{ uri: avatarUrl }} style={styles.mainAvatar} />
+              <View style={[styles.statusDot, { backgroundColor: employee.status === 'active' ? '#2ecc71' : '#95a5a6' }]} />
             </View>
             
             <Text style={styles.nameText}>{employee.name}</Text>
-            <Text style={styles.roleText}>{employee.role} • {employee.dept}</Text>
+            <Text style={styles.roleText}>{employee.role || 'Employé'} • {employee.dept || 'N/A'}</Text>
           </View>
         </View>
 
         {/* Stats Row */}
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: themeColors.text }]}>{employee.projectsCount}</Text>
+            <Text style={[styles.statValue, { color: themeColors.text }]}>{employee.projects_count || 0}</Text>
             <Text style={styles.statLabel}>Projets</Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: themeColors.border }]} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: themeColors.text }]}>{employee.tasksCount}</Text>
+            <Text style={[styles.statValue, { color: themeColors.text }]}>{employee.tasks_count || 0}</Text>
             <Text style={styles.statLabel}>Tâches</Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: themeColors.border }]} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: themeColors.text }]}>Active</Text>
+            <Text style={[styles.statValue, { color: employee.status === 'active' ? '#2ecc71' : '#e74c3c' }]}>
+              {employee.status === 'active' ? 'Actif' : 'Inactif'}
+            </Text>
             <Text style={styles.statLabel}>Statut</Text>
           </View>
         </View>
@@ -95,7 +136,7 @@ export default function EmployeeDetailScreen() {
               <Ionicons name="mail-outline" size={20} color="#FFCC00" />
               <View style={styles.infoTextWrapper}>
                 <Text style={styles.infoLabel}>Email Professionnel</Text>
-                <Text style={[styles.infoValue, { color: themeColors.text }]}>{employee.email}</Text>
+                <Text style={[styles.infoValue, { color: themeColors.text }]}>{employee.email || 'N/A'}</Text>
               </View>
             </View>
 
@@ -103,15 +144,15 @@ export default function EmployeeDetailScreen() {
               <Ionicons name="phone-portrait-outline" size={20} color="#FFCC00" />
               <View style={styles.infoTextWrapper}>
                 <Text style={styles.infoLabel}>Téléphone</Text>
-                <Text style={[styles.infoValue, { color: themeColors.text }]}>{employee.phone}</Text>
+                <Text style={[styles.infoValue, { color: themeColors.text }]}>{employee.mobile || 'N/A'}</Text>
               </View>
             </View>
 
             <View style={styles.infoItem}>
               <Ionicons name="location-outline" size={20} color="#FFCC00" />
               <View style={styles.infoTextWrapper}>
-                <Text style={styles.infoLabel}>Localisation</Text>
-                <Text style={[styles.infoValue, { color: themeColors.text }]}>{employee.location}</Text>
+                <Text style={styles.infoLabel}>Adresse</Text>
+                <Text style={[styles.infoValue, { color: themeColors.text }]}>{employee.address || 'N/A'}</Text>
               </View>
             </View>
           </View>
@@ -120,10 +161,18 @@ export default function EmployeeDetailScreen() {
             <Text style={styles.sectionTitle}>Détails Professionnels</Text>
             
             <View style={styles.infoItem}>
+              <Ionicons name="id-card-outline" size={20} color="#FFCC00" />
+              <View style={styles.infoTextWrapper}>
+                <Text style={styles.infoLabel}>ID Employé</Text>
+                <Text style={[styles.infoValue, { color: themeColors.text }]}>{employee.employee_id || 'N/A'}</Text>
+              </View>
+            </View>
+
+            <View style={styles.infoItem}>
               <Ionicons name="briefcase-outline" size={20} color="#FFCC00" />
               <View style={styles.infoTextWrapper}>
                 <Text style={styles.infoLabel}>Date d'intégration</Text>
-                <Text style={[styles.infoValue, { color: themeColors.text }]}>{employee.joiningDate}</Text>
+                <Text style={[styles.infoValue, { color: themeColors.text }]}>{employee.joining_date || 'N/A'}</Text>
               </View>
             </View>
 
@@ -131,7 +180,15 @@ export default function EmployeeDetailScreen() {
               <Ionicons name="people-outline" size={20} color="#FFCC00" />
               <View style={styles.infoTextWrapper}>
                 <Text style={styles.infoLabel}>Responsable hiérarchique</Text>
-                <Text style={[styles.infoValue, { color: themeColors.text }]}>{employee.reportingTo}</Text>
+                <Text style={[styles.infoValue, { color: themeColors.text }]}>{employee.reporting_to || 'N/A'}</Text>
+              </View>
+            </View>
+
+            <View style={styles.infoItem}>
+              <Ionicons name="calendar-outline" size={20} color="#FFCC00" />
+              <View style={styles.infoTextWrapper}>
+                <Text style={styles.infoLabel}>Date de naissance</Text>
+                <Text style={[styles.infoValue, { color: themeColors.text }]}>{employee.date_of_birth || 'N/A'}</Text>
               </View>
             </View>
           </View>
@@ -186,14 +243,13 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     borderColor: '#FFCC00',
   },
-  statusOnline: {
+  statusDot: {
     position: 'absolute',
     bottom: 5,
     right: 15,
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#2ecc71',
     borderWidth: 4,
     borderColor: '#000',
   },

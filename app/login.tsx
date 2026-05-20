@@ -36,10 +36,9 @@ export default function LoginScreen() {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs');
       return;
     }
-
     setLoading(true);
     try {
-      const response = await api.post('/login', {
+      const response = await api.post('login', {
         email: email,
         password: password,
         device_name: Platform.OS + '_' + (Platform.Version || 'unknown'),

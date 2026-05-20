@@ -11,7 +11,7 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  useKeepAwake();
+  // useKeepAwake(); // Désactivé pour éviter l'erreur "Unable to activate keep awake"
   const colorScheme = useColorScheme();
 
   return (

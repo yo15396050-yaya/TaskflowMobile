@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, Linking, Image, ActivityIndicator, RefreshControl } from 'react-native';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, Linking, Image, ActivityIndicator, RefreshControl, Modal, Alert } from 'react-native';
+
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -23,6 +24,9 @@ export default function ClientsListScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [menuVisible, setMenuVisible] = useState(false);
+
 
   const fetchClients = async () => {
     try {
@@ -59,6 +63,38 @@ export default function ClientsListScreen() {
   const handleWhatsApp = (phone: string) => Linking.openURL(`whatsapp://send?phone=${phone}`);
   const handleEmail = (email: string) => Linking.openURL(`mailto:${email}`);
 
+  const openMenu = (client: Client) => {
+    setSelectedClient(client);
+    setMenuVisible(true);
+  };
+
+  const handleDelete = async () => {
+    if (!selectedClient) return;
+
+    Alert.alert(
+      'Suppression',
+      `Êtes-vous sûr de vouloir supprimer le client "${selectedClient.name}" ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: 'Supprimer', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete(`/clients/${selectedClient.id}`);
+              setClients(clients.filter(c => c.id !== selectedClient.id));
+              setMenuVisible(false);
+              Alert.alert('Succès', 'Client supprimé avec succès.');
+            } catch (error: any) {
+              Alert.alert('Erreur', 'Impossible de supprimer le client.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+
   const renderClientItem = ({ item }: { item: Client }) => {
     const initial = item.name ? item.name.substring(0, 2).toUpperCase() : '??';
 
@@ -76,9 +112,10 @@ export default function ClientsListScreen() {
             <Text style={[styles.clientName, { color: themeColors.text }]} numberOfLines={1}>{item.name}</Text>
             <Text style={[styles.clientCompany, { color: themeColors.textSecondary }]} numberOfLines={1}>{item.company_name || 'Entreprise non spécifiée'}</Text>
           </View>
-          <TouchableOpacity style={styles.moreBtn}>
+          <TouchableOpacity style={styles.moreBtn} onPress={() => openMenu(item)}>
             <Ionicons name="ellipsis-vertical" size={20} color={themeColors.textSecondary} />
           </TouchableOpacity>
+
         </View>
 
         <View style={[styles.cardFooter, { borderTopColor: themeColors.border }]}>
@@ -162,9 +199,55 @@ export default function ClientsListScreen() {
           }
         />
       )}
+
+
+      {/* Action Menu Modal */}
+      <Modal visible={menuVisible} transparent animationType="fade">
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setMenuVisible(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: themeColors.cardBackground }]}>
+            <Text style={[styles.modalTitle, { color: themeColors.text }]}>{selectedClient?.name}</Text>
+            
+            <TouchableOpacity 
+              style={styles.menuItem} 
+              onPress={() => {
+                setMenuVisible(false);
+                router.push(`/clients/${selectedClient?.id}`);
+              }}
+            >
+              <Ionicons name="eye-outline" size={22} color={themeColors.accent} />
+              <Text style={[styles.menuItemText, { color: themeColors.text }]}>Voir les détails</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.menuItem} 
+              onPress={() => {
+                setMenuVisible(false);
+                router.push(`/clients/edit/${selectedClient?.id}`);
+              }}
+
+            >
+              <Ionicons name="create-outline" size={22} color="#3498db" />
+              <Text style={[styles.menuItemText, { color: themeColors.text }]}>Modifier le client</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.menuItem, { borderBottomWidth: 0 }]} 
+              onPress={handleDelete}
+            >
+              <Ionicons name="trash-outline" size={22} color="#e74c3c" />
+              <Text style={[styles.menuItemText, { color: '#e74c3c' }]}>Supprimer définitivement</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -223,6 +306,42 @@ const styles = StyleSheet.create({
   actionIcon: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
   locationTag: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   locationText: { fontSize: 11, fontWeight: '700' },
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 100 },
-  emptyText: { marginTop: 15, fontSize: 16, fontWeight: '600' }
+  emptyText: { marginTop: 15, fontSize: 16, fontWeight: '600' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 30,
+  },
+  modalContent: {
+    width: '100%',
+    borderRadius: 25,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    marginBottom: 20,
+    textAlign: 'center',
+    opacity: 0.8,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  menuItemText: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginLeft: 15,
+  },
 });
+

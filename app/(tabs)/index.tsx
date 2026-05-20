@@ -57,16 +57,19 @@ export default function HomeScreen() {
         user ? getSafe(`/dashboard/honoraires/${user.id}`, { sum: '0' }) : Promise.resolve({ data: { sum: '0' } })
       ]);
 
+      const dilisData = dilisResponse.data?.data || dilisResponse.data || [];
+      const tasksData = tasksResponse.data?.data || tasksResponse.data || [];
+
       setStats({
-        activeDiligences: dilisResponse.data?.length || 0,
-        totalTasks: tasksResponse.data?.length || 0,
+        activeDiligences: Array.isArray(dilisData) ? dilisData.length : 0,
+        totalTasks: Array.isArray(tasksData) ? tasksData.length : 0,
         userName: user?.name || 'Williams Guy',
         honoraires: honorairesResponse.data?.sum || '0',
         unreadNotifs: notifResponse.data?.count || 0
       });
 
-      if (Array.isArray(dilisResponse.data)) {
-        setDiligences(dilisResponse.data.slice(0, 5));
+      if (Array.isArray(dilisData)) {
+        setDiligences(dilisData.slice(0, 5));
       }
     } catch (error) {
       console.error('Erreur critique Dashboard:', error);

@@ -2,35 +2,78 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, RefreshControl } from 'react-native';
+import api from '@/services/api-service';
 
-const TABS = ['Aperçu', 'Tâches', 'Factures', 'Fichiers', 'Activité'];
+const TABS = ['Aperçu', 'Membres'];
 
 export default function DiligenceDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const themeColors = Colors[colorScheme];
+  const [project, setProject] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('Aperçu');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchProjectDetail = async () => {
+    try {
+      const response = await api.get(`/projects/${id}`);
+      setProject(response.data);
+    } catch (error) {
+      console.error('Erreur detail projet:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjectDetail();
+  }, [id]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchProjectDetail();
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: themeColors.background }]}>
+        <ActivityIndicator size="large" color={themeColors.accent} />
+      </View>
+    );
+  }
+
+  if (!project) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: themeColors.background }]}>
+        <Text style={{ color: themeColors.text }}>Projet introuvable</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20 }}>
+          <Text style={{ color: themeColors.accent }}>Retour</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const renderContent = () => {
     if (activeTab === 'Aperçu') {
       return (
         <>
-          {/* Progress Card */}
           <View style={[styles.mainCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
             <View style={styles.cardRow}>
               <View>
                 <Text style={[styles.label, { color: themeColors.textSecondary }]}>Statut</Text>
                 <View style={styles.statusBadge}>
-                  <View style={[styles.statusDot, { backgroundColor: '#679C0D' }]} />
-                  <Text style={styles.statusText}>TERMINÉE</Text>
+                  <View style={[styles.statusDot, { backgroundColor: project.status === 'finished' ? '#2ecc71' : '#3498db' }]} />
+                  <Text style={styles.statusText}>{project.status?.toUpperCase()}</Text>
                 </View>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={[styles.label, { color: themeColors.textSecondary }]}>Progression</Text>
-                <Text style={[styles.progressVal, { color: themeColors.text }]}>0%</Text>
+                <Text style={[styles.label, { color: themeColors.textSecondary }]}>Catégorie</Text>
+                <Text style={[styles.progressVal, { color: themeColors.text, fontSize: 14 }]}>{project.category_name}</Text>
               </View>
             </View>
 
@@ -39,118 +82,74 @@ export default function DiligenceDetailScreen() {
                 <Ionicons name="calendar-outline" size={16} color={themeColors.textSecondary} />
                 <View>
                   <Text style={styles.dateLabel}>Début</Text>
-                  <Text style={styles.dateText}>27/11/2024</Text>
+                  <Text style={[styles.dateText, { color: themeColors.text }]}>{project.start_date}</Text>
                 </View>
               </View>
               <View style={styles.dateBox}>
                 <Ionicons name="flag-outline" size={16} color="#e74c3c" />
                 <View>
                   <Text style={styles.dateLabel}>Limite</Text>
-                  <Text style={styles.dateText}>06/01/2025</Text>
+                  <Text style={[styles.dateText, { color: themeColors.text }]}>{project.deadline}</Text>
                 </View>
               </View>
             </View>
           </View>
 
-          {/* Client Card */}
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Client</Text>
           </View>
           <View style={[styles.clientCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
             <View style={styles.clientInfo}>
               <View style={styles.avatarLarge}>
-                <Text style={styles.avatarText}>MA</Text>
+                <Text style={styles.avatarText}>{project.client?.name?.substring(0, 2).toUpperCase()}</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.clientName, { color: themeColors.text }]}>Miss assemien</Text>
-                <Text style={[styles.clientCompany, { color: themeColors.textSecondary }]}>SUBLIME START</Text>
-                <View style={styles.countryRow}>
-                  <Ionicons name="location-outline" size={12} color={themeColors.textSecondary} />
-                  <Text style={styles.countryText}>Côte d'Ivoire</Text>
-                </View>
+                <Text style={[styles.clientName, { color: themeColors.text }]}>{project.client?.name}</Text>
+                <Text style={[styles.clientCompany, { color: themeColors.textSecondary }]}>{project.client?.company_name}</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.msgBtn}>
-              <Ionicons name="logo-whatsapp" size={18} color="#FFF" />
-              <Text style={styles.msgBtnText}>Message WhatsApp</Text>
-            </TouchableOpacity>
           </View>
 
-          {/* Stats Grid */}
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Statistiques</Text>
+            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Résumé</Text>
           </View>
-          <View style={styles.statsGrid}>
-            {[
-              { label: 'Budget', value: '0 FCFA', icon: 'wallet-outline' },
-              { label: 'Heures', value: '0.00', icon: 'time-outline' },
-              { label: 'Gains', value: '0 FCFA', icon: 'trending-up-outline' },
-              { label: 'Profit', value: '0 FCFA', icon: 'cash-outline' },
-            ].map((stat, i) => (
-              <View key={i} style={[styles.statCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
-                <View style={styles.statIconBg}>
-                  <Ionicons name={stat.icon as any} size={18} color="#FFCC00" />
-                </View>
-                <Text style={[styles.statValue, { color: themeColors.text }]}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-              </View>
-            ))}
+          <View style={[styles.clientCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
+            <Text style={{ color: themeColors.text, lineHeight: 20 }}>
+              {project.project_summary || "Aucun résumé disponible."}
+            </Text>
           </View>
         </>
       );
     }
 
-    if (activeTab === 'Tâches') {
+    if (activeTab === 'Membres') {
       return (
-        <View>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Tâches associées</Text>
-          </View>
-          {[1, 2, 3].map((i) => (
-            <View key={i} style={[styles.taskMiniCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
-              <TouchableOpacity style={styles.miniCheck}>
-                <Ionicons name="square-outline" size={20} color={themeColors.textSecondary} />
-              </TouchableOpacity>
-              <View style={{ flex: 1, marginLeft: 10 }}>
-                <Text style={[styles.taskMiniTitle, { color: themeColors.text }]}>Étape de vérification #{i}</Text>
-                <Text style={{ fontSize: 11, color: themeColors.textSecondary, marginTop: 2 }}>Responsable : Williams Guy</Text>
+        <View style={{ gap: 12 }}>
+          {project.members?.map((member: any) => (
+            <View key={member.id} style={[styles.memberCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
+              <View style={styles.avatarSmall}>
+                <Text style={styles.avatarTextSmall}>{member.name?.substring(0, 2).toUpperCase()}</Text>
               </View>
-              <View style={styles.priorityMiniBadge}>
-                <Text style={styles.priorityMiniText}>HAUTE</Text>
-              </View>
+              <Text style={[styles.memberName, { color: themeColors.text }]}>{member.name}</Text>
             </View>
           ))}
         </View>
       );
     }
-
-    return (
-      <View style={styles.emptyState}>
-        <Ionicons name="construct-outline" size={48} color={themeColors.textSecondary} />
-        <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
-          Cette section "{activeTab}" est bientôt disponible.
-        </Text>
-      </View>
-    );
   };
 
   return (
     <View style={[styles.container, { backgroundColor: themeColors.background }]}>
-      {/* Header Dark */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#FFCC00" />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle} numberOfLines={1}>Congé de fin d'année DC-K</Text>
+          <Text style={styles.headerTitle} numberOfLines={1}>{project.project_name}</Text>
           <Text style={styles.headerSub}>Diligences • ID: {id}</Text>
         </View>
-        <TouchableOpacity style={styles.pinBtn}>
-          <Ionicons name="pin-outline" size={20} color="#FFF" />
-        </TouchableOpacity>
       </View>
 
-      {/* Tabs Menu */}
       <View style={styles.tabsWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScroll}>
           {TABS.map((tab) => (
@@ -166,7 +165,11 @@ export default function DiligenceDetailScreen() {
         </ScrollView>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        contentContainerStyle={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={themeColors.accent} />}
+      >
         {renderContent()}
       </ScrollView>
     </View>
@@ -175,6 +178,7 @@ export default function DiligenceDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  centered: { justifyContent: 'center', alignItems: 'center' },
   header: {
     paddingTop: 60,
     paddingHorizontal: 20,
@@ -187,8 +191,7 @@ const styles = StyleSheet.create({
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
   headerTitle: { color: '#FFF', fontSize: 18, fontWeight: '800' },
   headerSub: { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '600' },
-  pinBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
-  tabsWrapper: { backgroundColor: '#181818', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  tabsWrapper: { backgroundColor: '#181818' },
   tabsScroll: { paddingHorizontal: 20 },
   tabItem: { paddingVertical: 15, paddingHorizontal: 15, marginRight: 10, position: 'relative' },
   tabItemActive: {},
@@ -198,10 +201,10 @@ const styles = StyleSheet.create({
   mainCard: { borderRadius: 24, padding: 20, borderWidth: 1, marginBottom: 10 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   label: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', marginBottom: 5 },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f0fdf4', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, gap: 6 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, gap: 6 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
-  statusText: { fontSize: 10, fontWeight: '900', color: '#166534' },
-  progressVal: { fontSize: 24, fontWeight: '900' },
+  statusText: { fontSize: 10, fontWeight: '900', color: '#888' },
+  progressVal: { fontWeight: '800' },
   dateRow: { flexDirection: 'row', gap: 20, paddingTop: 15, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
   dateBox: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   dateLabel: { fontSize: 11, color: '#888', fontWeight: '600' },
@@ -209,25 +212,13 @@ const styles = StyleSheet.create({
   sectionHeader: { marginTop: 20, marginBottom: 15, marginLeft: 5 },
   sectionTitle: { fontSize: 16, fontWeight: '800' },
   clientCard: { borderRadius: 24, padding: 20, borderWidth: 1, marginBottom: 10 },
-  clientInfo: { flexDirection: 'row', alignItems: 'center', gap: 15, marginBottom: 20 },
+  clientInfo: { flexDirection: 'row', alignItems: 'center', gap: 15 },
   avatarLarge: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFCC00', justifyContent: 'center', alignItems: 'center' },
   avatarText: { fontSize: 18, fontWeight: '900', color: '#000' },
   clientName: { fontSize: 17, fontWeight: '800' },
   clientCompany: { fontSize: 13, fontWeight: '600' },
-  countryRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  countryText: { fontSize: 12, color: '#888', fontWeight: '600' },
-  msgBtn: { backgroundColor: '#25D366', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: 15, gap: 8 },
-  msgBtnText: { color: '#FFF', fontWeight: '800', fontSize: 14 },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  statCard: { width: '47%', borderRadius: 20, padding: 16, borderWidth: 1 },
-  statIconBg: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,204,0,0.1)', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  statValue: { fontSize: 15, fontWeight: '800', marginBottom: 4 },
-  statLabel: { fontSize: 11, color: '#888', fontWeight: '700', textTransform: 'uppercase' },
-  taskMiniCard: { flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 16, borderWidth: 1, marginBottom: 12 },
-  miniCheck: { padding: 2 },
-  taskMiniTitle: { fontSize: 14, fontWeight: '700' },
-  priorityMiniBadge: { backgroundColor: '#fee2e2', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  priorityMiniText: { color: '#dc2626', fontSize: 9, fontWeight: '900' },
-  emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: 100, paddingHorizontal: 40 },
-  emptyText: { textAlign: 'center', marginTop: 15, fontSize: 14, fontWeight: '600', opacity: 0.6 }
+  memberCard: { flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 20, borderWidth: 1, gap: 15 },
+  avatarSmall: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFCC00', justifyContent: 'center', alignItems: 'center' },
+  avatarTextSmall: { fontSize: 14, fontWeight: '900', color: '#000' },
+  memberName: { fontSize: 15, fontWeight: '700' }
 });

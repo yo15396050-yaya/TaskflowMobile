@@ -97,7 +97,7 @@ export default function EmployeesScreen() {
             <Ionicons name="arrow-back" size={24} color="#FFCC00" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Annuaire Employés</Text>
-          <TouchableOpacity style={styles.addBtn}>
+          <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/rh/employes/create')}>
             <Ionicons name="person-add-outline" size={22} color="#FFCC00" />
           </TouchableOpacity>
         </View>

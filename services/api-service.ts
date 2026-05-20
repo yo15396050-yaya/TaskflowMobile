@@ -1,92 +1,101 @@
-import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
 
-const API_URL = 'http://192.168.1.18/CRM_old/public/api';
+const API_URL = 'http://192.168.1.21/CRM_old/public/api/';
 
-const api = axios.create({
+/**
+ * Service API utilisant Fetch (plus stable qu'Axios sur ce réseau/appareil)
+ * Garde la même interface qu'Axios pour la compatibilité.
+ */
+const api = {
     baseURL: API_URL,
-    headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
+
+    async request(url: string, options: any = {}) {
+        // 1. Nettoyage et construction de l'URL
+        let fullUrl = url.startsWith('http') ? url : `${this.baseURL}${url.startsWith('/') ? url.substring(1) : url}`;
+        
+        // 2. Gestion des paramètres (Query String)
+        const params = options.params || {};
+        const token = await SecureStore.getItemAsync('user_token');
+        if (token && !url.includes('login')) {
+            params.token = token;
+        }
+
+        const queryString = Object.keys(params)
+            .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+            .join('&');
+
+        if (queryString) {
+            fullUrl += (fullUrl.includes('?') ? '&' : '?') + queryString;
+        }
+        
+        // 3. En-têtes (Headers)
+        let headers: any = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            ...options.headers,
+        };
+
+        if (token && !url.includes('login')) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        console.log(`📡 [API ${options.method || 'GET'}] ${fullUrl}`);
+
+        try {
+            const response = await fetch(fullUrl, {
+                method: options.method || 'GET',
+                headers: headers,
+                body: options.data ? JSON.stringify(options.data) : undefined,
+            });
+
+            const contentType = response.headers.get('content-type');
+            let data;
+            
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+                console.log(`📦 [DATA RECEIVED] ${fullUrl.split('?')[0]}:`, JSON.stringify(data).substring(0, 200));
+            } else {
+                const text = await response.text();
+                console.warn(`⚠️ Réponse non-JSON reçue de ${fullUrl}:`, text.substring(0, 200));
+                data = { message: text };
+            }
+
+            // Gestion des erreurs d'auth (401)
+            if (response.status === 401) {
+                console.log('🔒 Session expirée - Redirection login');
+                await SecureStore.deleteItemAsync('user_token');
+                router.replace('/login');
+                return Promise.reject({ response: { status: 401, data } });
+            }
+
+            if (!response.ok) {
+                console.error(`❌ Erreur ${response.status} sur ${fullUrl}`);
+                return Promise.reject({ response: { status: response.status, data } });
+            }
+
+            return { data, status: response.status };
+        } catch (error: any) {
+            console.error('🔥 Erreur fatale API:', error.message);
+            throw error;
+        }
     },
-    timeout: 30000,
-});
 
-// Liste des messages JWT qui indiquent un problème d'authentification
-const JWT_AUTH_ERRORS = [
-    'token not provided',
-    'token has expired',
-    'token is invalid',
-    'token blacklisted',
-    'token not found',
-    'could not decode token',
-    'unauthenticated',
-];
+    get(url: string, config: any = {}) {
+        return this.request(url, { ...config, method: 'GET' });
+    },
 
-/**
- * Vérifie si une erreur serveur est en réalité un problème d'authentification JWT
- */
-const isJwtAuthError = (error: any): boolean => {
-    const message = (
-        error.response?.data?.message ||
-        error.response?.data?.error?.message ||
-        ''
-    ).toLowerCase();
-    return JWT_AUTH_ERRORS.some(jwtErr => message.includes(jwtErr));
-};
+    post(url: string, data: any = {}, config: any = {}) {
+        return this.request(url, { ...config, method: 'POST', data });
+    },
 
-/**
- * Gère la déconnexion suite à un problème d'authentification
- */
-const handleAuthFailure = async () => {
-    console.log('🔒 Session expirée ou token invalide — redirection vers login');
-    await SecureStore.deleteItemAsync('user_token');
-    await SecureStore.deleteItemAsync('user_data');
-    try {
-        router.replace('/login');
-    } catch (e) {
-        // Le router n'est peut-être pas encore monté
+    put(url: string, data: any = {}, config: any = {}) {
+        return this.request(url, { ...config, method: 'PUT', data });
+    },
+
+    delete(url: string, config: any = {}) {
+        return this.request(url, { ...config, method: 'DELETE' });
     }
 };
-
-// Intercepteur de requête : attache le token JWT
-api.interceptors.request.use(async (config) => {
-    const token = await SecureStore.getItemAsync('user_token');
-    if (token && !config.url?.includes('/login')) {
-        config.params = { ...config.params, token: token };
-        config.headers.Authorization = `Bearer ${token}`;
-        console.log(`🚀 [API CALL] ${config.baseURL}${config.url}?token=...`);
-    } else if (config.url?.includes('/login')) {
-        console.log(`🚀 [API CALL] ${config.baseURL}${config.url} (POST Login)`);
-    } else {
-        console.warn(`⚠️ Aucun token trouvé pour: ${config.url}`);
-    }
-    return config;
-}, (error) => {
-    return Promise.reject(error);
-});
-
-// Intercepteur de réponse : gère les erreurs 401 ET les 500 JWT
-api.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-        const status = error.response?.status;
-
-        // Cas 1 : 401 classique (Unauthorized)
-        if (status === 401) {
-            await handleAuthFailure();
-            return Promise.reject(error);
-        }
-
-        // Cas 2 : 500 causé par le middleware tymon/jwt-auth (Token not provided, etc.)
-        if (status === 500 && isJwtAuthError(error)) {
-            await handleAuthFailure();
-            return Promise.reject(error);
-        }
-
-        return Promise.reject(error);
-    }
-);
 
 export default api;

@@ -70,8 +70,8 @@ export default function TasksScreen() {
   };
 
   const filteredTasks = tasks.filter(item =>
-    (item.name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (item.request_text || '').toLowerCase().includes(search.toLowerCase())
+    (item.heading || '').toLowerCase().includes(search.toLowerCase()) ||
+    (item.project_name || '').toLowerCase().includes(search.toLowerCase())
   );
 
   const getStatusColor = (status: string) => {
@@ -84,7 +84,11 @@ export default function TasksScreen() {
   };
 
   const renderTaskItem = ({ item }: { item: any }) => (
-    <View style={[styles.taskCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
+    <TouchableOpacity 
+      style={[styles.taskCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}
+      onPress={() => router.push(`/travail/tasks/${item.id}`)}
+      activeOpacity={0.7}
+    >
       <TouchableOpacity style={styles.checkCircle}>
         <Ionicons
           name={item.status === 'terminé' ? "checkbox" : "square-outline"}
@@ -94,8 +98,8 @@ export default function TasksScreen() {
       </TouchableOpacity>
 
       <View style={styles.taskInfo}>
-        <Text style={[styles.taskTitle, { color: themeColors.text }]}>{item.name || 'Sans titre'}</Text>
-        <Text style={styles.projectName}>{item.type_request || 'Général'}</Text>
+        <Text style={[styles.taskTitle, { color: themeColors.text }]}>{item.heading || 'Sans titre'}</Text>
+        <Text style={styles.projectName}>{item.project_name || 'Général'}</Text>
 
         <View style={styles.taskMeta}>
           <View style={[styles.priorityBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
@@ -107,7 +111,7 @@ export default function TasksScreen() {
           </View>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (

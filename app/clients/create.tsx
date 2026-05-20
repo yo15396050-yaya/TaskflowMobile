@@ -1,9 +1,11 @@
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput, Switch, Modal, FlatList, Alert, Image, ActivityIndicator } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import api from '@/services/api-service';
 
 // Options pour les sélections
@@ -13,6 +15,21 @@ const REGIMES_FISCAUX = ['RSI', 'RNI', 'Entreprenant', 'Régime Simplifié'];
 const GENDERS = ['Masculin', 'Féminin'];
 const SALUTATIONS = ['M.', 'Mme', 'Mlle', 'Dr', 'Prof'];
 const PAYS = ['Côte d\'Ivoire', 'France', 'Sénégal', 'Mali', 'Burkina Faso', 'Bénin', 'Togo'];
+
+const FormSection = ({ title, children, themeColors }: { title: string, children: React.ReactNode, themeColors: any }) => (
+  <View style={styles.section}>
+    <Text style={[styles.sectionTitle, { color: themeColors.text }]}>{title}</Text>
+    <View style={styles.sectionDivider} />
+    {children}
+  </View>
+);
+
+const InputLabel = ({ label, required = false, themeColors }: { label: string, required?: boolean, themeColors: any }) => (
+  <Text style={[styles.label, { color: themeColors.textSecondary }]}>
+    {label} {required && <Text style={styles.required}>*</Text>}
+  </Text>
+);
+
 
 export default function CreateClientScreen() {
   const router = useRouter();
@@ -52,7 +69,9 @@ export default function CreateClientScreen() {
     addedBy: 'Admin',
     address: '',
     shippingAddress: '',
-    note: ''
+    note: '',
+    avatar: null as string | null,
+    logo: null as string | null,
   });
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -72,15 +91,49 @@ export default function CreateClientScreen() {
 
     setLoading(true);
     try {
-      const response = await api.post('/clients', form);
+      const formData = new FormData();
+      
+      // Ajout des champs texte
+      Object.keys(form).forEach(key => {
+        if (key !== 'avatar' && key !== 'logo' && (form as any)[key] !== null) {
+          formData.append(key, (form as any)[key].toString());
+        }
+      });
+
+      // Ajout des images
+      if (form.avatar) {
+        const uriParts = form.avatar.split('.');
+        const fileType = uriParts[uriParts.length - 1];
+        formData.append('avatar', {
+          uri: form.avatar,
+          name: `avatar.${fileType}`,
+          type: `image/${fileType}`,
+        } as any);
+      }
+
+      if (form.logo) {
+        const uriParts = form.logo.split('.');
+        const fileType = uriParts[uriParts.length - 1];
+        formData.append('logo', {
+          uri: form.logo,
+          name: `logo.${fileType}`,
+          type: `image/${fileType}`,
+        } as any);
+      }
+
+      const response = await api.post('/clients', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       
       Alert.alert('Succès', 'Le client a été enregistré avec succès.');
       
       if (type === 'save') {
-        router.push('/(tabs)/clients'); // Redirection vers la liste
+        router.push('/clients');
       } else {
-        // Reset form pour en ajouter un autre
-        setForm({ ...form, companyName: '', leaderName: '', mobile: '', email: '', password: '' });
+
+        setForm({ ...form, companyName: '', leaderName: '', mobile: '', email: '', password: '', avatar: null, logo: null });
       }
     } catch (error: any) {
       console.error('Erreur creation client:', error.response?.data || error.message);
@@ -90,19 +143,28 @@ export default function CreateClientScreen() {
     }
   };
 
-  const FormSection = ({ title, children }: { title: string, children: React.ReactNode }) => (
-    <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: themeColors.text }]}>{title}</Text>
-      <View style={styles.sectionDivider} />
-      {children}
-    </View>
-  );
 
-  const InputLabel = ({ label, required = false }: { label: string, required?: boolean }) => (
-    <Text style={[styles.label, { color: themeColors.textSecondary }]}>
-      {label} {required && <Text style={styles.required}>*</Text>}
-    </Text>
-  );
+  const pickImage = async (field: 'avatar' | 'logo') => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission refusée', 'Nous avons besoin de votre permission pour accéder à la galerie.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: field === 'avatar' ? [1, 1] : [4, 3],
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      setForm({ ...form, [field]: result.assets[0].uri });
+    }
+  };
+
+
+
 
   return (
     <View style={[styles.container, { backgroundColor: themeColors.background }]}>
@@ -122,10 +184,11 @@ export default function CreateClientScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         
         {/* SECTION 1: DÉTAILS DU COMPTE */}
-        <FormSection title="Détails du compte">
+        <FormSection title="Détails du compte" themeColors={themeColors}>
           <View style={styles.row}>
             <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-              <InputLabel label="Forme juridique" />
+              <InputLabel label="Forme juridique" themeColors={themeColors} />
+
               <TouchableOpacity 
                 style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}
                 onPress={() => openSelect('legalForm', 'Forme Juridique', FORME_JURIDIQUE)}
@@ -137,7 +200,8 @@ export default function CreateClientScreen() {
               </TouchableOpacity>
             </View>
             <View style={[styles.inputGroup, { flex: 1 }]}>
-               <InputLabel label="Catégorie" />
+               <InputLabel label="Catégorie" themeColors={themeColors} />
+
                <TouchableOpacity 
                 style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}
                 onPress={() => openSelect('category', 'Catégorie de client', CATEGORIES)}
@@ -151,7 +215,8 @@ export default function CreateClientScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <InputLabel label="E-mail" />
+            <InputLabel label="E-mail" themeColors={themeColors} />
+
             <TextInput 
               style={[styles.input, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground, color: themeColors.text }]}
               placeholder="johndoe@example.com"
@@ -163,7 +228,8 @@ export default function CreateClientScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <InputLabel label="Mot de passe" />
+            <InputLabel label="Mot de passe" themeColors={themeColors} />
+
             <View style={[styles.inputContainer, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}>
                  <TextInput 
                     style={[styles.flexInput, { color: themeColors.text }]}
@@ -205,9 +271,10 @@ export default function CreateClientScreen() {
         </FormSection>
 
         {/* SECTION 2: INFORMATIONS DE BASE */}
-        <FormSection title="Détails de l'entreprise">
+        <FormSection title="Détails de l'entreprise" themeColors={themeColors}>
           <View style={styles.inputGroup}>
-            <InputLabel label="Nom de l'entreprise" required />
+            <InputLabel label="Nom de l'entreprise" required themeColors={themeColors} />
+
             <TextInput 
               style={[styles.input, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground, color: themeColors.text }]}
               placeholder="Ex: Acmé Corporation"
@@ -219,7 +286,8 @@ export default function CreateClientScreen() {
 
           <View style={styles.row}>
             <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-                <InputLabel label="Nom commercial" />
+                <InputLabel label="Nom commercial" themeColors={themeColors} />
+
                 <TextInput 
                     style={[styles.input, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground, color: themeColors.text }]}
                     placeholder="Nom commercial"
@@ -229,7 +297,8 @@ export default function CreateClientScreen() {
                 />
             </View>
             <View style={[styles.inputGroup, { flex: 1 }]}>
-                <InputLabel label="Sigle" />
+                <InputLabel label="Sigle" themeColors={themeColors} />
+
                 <TextInput 
                     style={[styles.input, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground, color: themeColors.text }]}
                     placeholder="Sigle"
@@ -243,26 +312,46 @@ export default function CreateClientScreen() {
           <View style={styles.photoUploadRow}>
              <View style={styles.uploadBox}>
                 <Text style={styles.uploadLabel}>Image Profil</Text>
-                <TouchableOpacity style={[styles.photoFrame, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}>
-                   <Ionicons name="camera-outline" size={30} color="#888" />
-                   <Text style={styles.photoHint}>Cliquez</Text>
+                <TouchableOpacity 
+                  style={[styles.photoFrame, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}
+                  onPress={() => pickImage('avatar')}
+                >
+                   {form.avatar ? (
+                     <Image source={{ uri: form.avatar }} style={styles.previewImage} />
+                   ) : (
+                     <>
+                       <Ionicons name="camera-outline" size={30} color="#888" />
+                       <Text style={styles.photoHint}>Cliquez</Text>
+                     </>
+                   )}
                 </TouchableOpacity>
              </View>
              <View style={styles.uploadBox}>
                 <Text style={styles.uploadLabel}>Logo Entreprise</Text>
-                <TouchableOpacity style={[styles.photoFrame, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}>
-                   <Ionicons name="business-outline" size={30} color="#888" />
-                   <Text style={styles.photoHint}>Cliquez</Text>
+                <TouchableOpacity 
+                  style={[styles.photoFrame, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}
+                  onPress={() => pickImage('logo')}
+                >
+                   {form.logo ? (
+                     <Image source={{ uri: form.logo }} style={styles.previewImage} />
+                   ) : (
+                     <>
+                       <Ionicons name="business-outline" size={30} color="#888" />
+                       <Text style={styles.photoHint}>Cliquez</Text>
+                     </>
+                   )}
                 </TouchableOpacity>
              </View>
           </View>
+
         </FormSection>
 
         {/* SECTION 3: DIRIGEANT */}
-        <FormSection title="Coordonnées du dirigeant">
+        <FormSection title="Coordonnées du dirigeant" themeColors={themeColors}>
            <View style={styles.row}>
              <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-                <InputLabel label="Genre" />
+                <InputLabel label="Genre" themeColors={themeColors} />
+
                 <TouchableOpacity 
                     style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}
                     onPress={() => openSelect('gender', 'Sexe', GENDERS)}
@@ -272,7 +361,8 @@ export default function CreateClientScreen() {
                 </TouchableOpacity>
              </View>
              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <InputLabel label="Salutation" />
+                <InputLabel label="Salutation" themeColors={themeColors} />
+
                 <TouchableOpacity 
                     style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}
                     onPress={() => openSelect('salutation', 'Appellation', SALUTATIONS)}
@@ -284,7 +374,8 @@ export default function CreateClientScreen() {
            </View>
 
            <View style={styles.inputGroup}>
-             <InputLabel label="Nom du dirigeant" required />
+             <InputLabel label="Nom du dirigeant" required themeColors={themeColors} />
+
              <TextInput 
                 style={[styles.input, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground, color: themeColors.text }]}
                 placeholder="Nom complet"
@@ -296,7 +387,8 @@ export default function CreateClientScreen() {
 
            <View style={styles.row}>
              <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-                <InputLabel label="Mobile" required />
+                <InputLabel label="Mobile" required themeColors={themeColors} />
+
                 <TextInput 
                     style={[styles.input, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground, color: themeColors.text }]}
                     placeholder="0123456789"
@@ -307,7 +399,8 @@ export default function CreateClientScreen() {
                 />
              </View>
              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <InputLabel label="WhatsApp" />
+                <InputLabel label="WhatsApp" themeColors={themeColors} />
+
                 <TextInput 
                     style={[styles.input, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground, color: themeColors.text }]}
                     placeholder="WhatsApp"
@@ -321,9 +414,10 @@ export default function CreateClientScreen() {
         </FormSection>
 
         {/* SECTION 4: INFOS FISCALES & LÉGALES */}
-        <FormSection title="Détails fiscaux et légaux">
+        <FormSection title="Détails fiscaux et légaux" themeColors={themeColors}>
            <View style={styles.inputGroup}>
-             <InputLabel label="Régime fiscal" />
+             <InputLabel label="Régime fiscal" themeColors={themeColors} />
+
              <TouchableOpacity 
                 style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}
                 onPress={() => openSelect('taxRegime', 'Régime Fiscal', REGIMES_FISCAUX)}
@@ -337,7 +431,8 @@ export default function CreateClientScreen() {
 
            <View style={styles.row}>
               <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-                <InputLabel label="Numéro RCCM" />
+                <InputLabel label="Numéro RCCM" themeColors={themeColors} />
+
                 <TextInput 
                     style={[styles.input, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground, color: themeColors.text }]}
                     placeholder="RCCM"
@@ -347,7 +442,8 @@ export default function CreateClientScreen() {
                 />
               </View>
               <View style={[styles.inputGroup, { flex: 1 }]}>
-                <InputLabel label="Compte Contribuable" />
+                <InputLabel label="Compte Contribuable" themeColors={themeColors} />
+
                 <TextInput 
                     style={[styles.input, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground, color: themeColors.text }]}
                     placeholder="N° CC"
@@ -360,7 +456,8 @@ export default function CreateClientScreen() {
 
            <View style={styles.row}>
               <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-                <InputLabel label="Numéro IDU" />
+                <InputLabel label="Numéro IDU" themeColors={themeColors} />
+
                 <TextInput 
                     style={[styles.input, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground, color: themeColors.text }]}
                     placeholder="IDU"
@@ -370,7 +467,8 @@ export default function CreateClientScreen() {
                 />
               </View>
               <View style={[styles.inputGroup, { flex: 1 }]}>
-                <InputLabel label="Capital (XOF)" />
+                <InputLabel label="Capital (XOF)" themeColors={themeColors} />
+
                 <TextInput 
                     style={[styles.input, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground, color: themeColors.text }]}
                     placeholder="Montant du capital"
@@ -383,7 +481,8 @@ export default function CreateClientScreen() {
            </View>
 
            <View style={styles.inputGroup}>
-             <InputLabel label="Activités principales" />
+             <InputLabel label="Activités principales" themeColors={themeColors} />
+
              <TextInput 
                 style={[styles.textArea, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground, color: themeColors.text }]}
                 placeholder="Décrivez les activités..."
@@ -397,10 +496,11 @@ export default function CreateClientScreen() {
         </FormSection>
 
         {/* SECTION 5: LOCALISATION */}
-        <FormSection title="Localisation et Adresse">
+        <FormSection title="Localisation et Adresse" themeColors={themeColors}>
            <View style={styles.row}>
              <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-                <InputLabel label="Pays" />
+                <InputLabel label="Pays" themeColors={themeColors} />
+
                 <TouchableOpacity 
                     style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}
                     onPress={() => openSelect('country', 'Pays', PAYS)}
@@ -410,7 +510,8 @@ export default function CreateClientScreen() {
                 </TouchableOpacity>
              </View>
              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <InputLabel label="Ville" />
+                <InputLabel label="Ville" themeColors={themeColors} />
+
                 <TextInput 
                     style={[styles.input, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground, color: themeColors.text }]}
                     placeholder="Ex: Abidjan"
@@ -422,7 +523,8 @@ export default function CreateClientScreen() {
            </View>
 
            <View style={styles.inputGroup}>
-             <InputLabel label="Adresse (Localisation)" />
+             <InputLabel label="Adresse (Localisation)" themeColors={themeColors} />
+
              <TextInput 
                 style={[styles.textArea, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground, color: themeColors.text }]}
                 placeholder="132 My Street, Kingston..."
@@ -435,7 +537,8 @@ export default function CreateClientScreen() {
            </View>
 
            <View style={styles.inputGroup}>
-             <InputLabel label="Adresse de livraison" />
+             <InputLabel label="Adresse de livraison" themeColors={themeColors} />
+
              <TextInput 
                 style={[styles.textArea, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground, color: themeColors.text }]}
                 placeholder="Même que localisation..."
@@ -548,5 +651,7 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 },
   modalTitle: { fontSize: 20, fontWeight: '900' },
   optionItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 20, borderBottomWidth: 1 },
-  optionLabel: { fontSize: 16, fontWeight: '600' }
+  optionLabel: { fontSize: 16, fontWeight: '600' },
+  previewImage: { width: '100%', height: '100%', borderRadius: 20 },
 });
+
