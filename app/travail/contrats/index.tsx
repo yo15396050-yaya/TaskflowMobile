@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl } from 'react-native';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -51,6 +51,7 @@ export default function ContractsScreen() {
   const renderContract = ({ item }: { item: any }) => (
     <TouchableOpacity 
       style={[styles.contractCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}
+      onPress={() => Alert.alert('Détails du Contrat', `Client / Entité : ${item.type}\nObjet : ${item.subject}\nType : ${item.type}\nMontant facturé : ${item.amount}\nDate d'effet : ${item.start_date}\nStatut actuel : ${item.status}`, [{text: 'Fermer', style: 'cancel'}])}
     >
       <View style={styles.cardHeader}>
         <View style={[styles.typeBadge, { backgroundColor: 'rgba(52, 152, 219, 0.1)' }]}>

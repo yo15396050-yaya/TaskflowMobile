@@ -139,7 +139,7 @@ export default function CreateDiligenceScreen() {
                 placeholderTextColor="#666"
                 value={form.deadline}
                 onChangeText={(t) => setForm({...form, deadline: t})}
-                disabled={form.withoutDeadline}
+                editable={!form.withoutDeadline}
               />
               <Ionicons name="calendar-outline" size={18} color={themeColors.textSecondary} />
             </View>

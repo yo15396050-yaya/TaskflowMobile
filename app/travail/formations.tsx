@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ScrollView, Modal } from 'react-native';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ScrollView, Modal, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -106,6 +106,7 @@ export default function FormationScreen() {
   const themeColors = Colors[colorScheme];
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
+  const [payments, setPayments] = useState(PAYMENTS_DATA);
   const [detailModal, setDetailModal] = useState<typeof PAYMENTS_DATA[0] | null>(null);
 
   const filters = [
@@ -115,7 +116,7 @@ export default function FormationScreen() {
     { id: 'rejected', label: 'Rejeté' },
   ];
 
-  const filteredData = PAYMENTS_DATA.filter(item => {
+  const filteredData = payments.filter(item => {
     const matchSearch =
       item.participant.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -129,10 +130,10 @@ export default function FormationScreen() {
   });
 
   // Summary
-  const pendingCount = PAYMENTS_DATA.filter(p => p.status === 'en_attente').length;
-  const validatedCount = PAYMENTS_DATA.filter(p => p.status === 'validé').length;
-  const totalAmount = PAYMENTS_DATA.reduce((sum, p) => sum + p.amount, 0);
-  const totalTickets = PAYMENTS_DATA.reduce((sum, p) => sum + p.tickets, 0);
+  const pendingCount = payments.filter(p => p.status === 'en_attente').length;
+  const validatedCount = payments.filter(p => p.status === 'validé').length;
+  const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
+  const totalTickets = payments.reduce((sum, p) => sum + p.tickets, 0);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -276,6 +277,22 @@ export default function FormationScreen() {
     </View>
   );
 
+  const handleValidate = (id: string) => {
+    setTimeout(() => {
+      setPayments(prev => prev.map(p => p.id === id ? { ...p, status: 'validé' } : p));
+      setDetailModal(null);
+      Alert.alert('Succès', 'Le paiement a été validé avec succès.');
+    }, 500);
+  };
+
+  const handleReject = (id: string) => {
+    setTimeout(() => {
+      setPayments(prev => prev.map(p => p.id === id ? { ...p, status: 'rejeté' } : p));
+      setDetailModal(null);
+      Alert.alert('Succès', 'Le paiement a été rejeté.');
+    }, 500);
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: themeColors.background }]}>
       {/* Header */}
@@ -288,7 +305,7 @@ export default function FormationScreen() {
             <Text style={styles.headerTitle}>Formation</Text>
             <Text style={styles.headerSubtitle}>Validation des paiements</Text>
           </View>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => Alert.alert('Exportation', 'Démarrage de la génération et du téléchargement du grand livre des paiements au format CSV.')}>
             <Ionicons name="download-outline" size={24} color="#FFCC00" />
           </TouchableOpacity>
         </View>
@@ -372,11 +389,11 @@ export default function FormationScreen() {
                 {/* Action Buttons */}
                 {detailModal.status === 'en_attente' && (
                   <View style={styles.actionRow}>
-                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#2ecc71' }]}>
+                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#2ecc71' }]} onPress={() => handleValidate(detailModal.id)}>
                       <Ionicons name="checkmark-circle" size={18} color="#FFF" />
                       <Text style={styles.actionBtnText}>Valider</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#e74c3c' }]}>
+                    <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#e74c3c' }]} onPress={() => handleReject(detailModal.id)}>
                       <Ionicons name="close-circle" size={18} color="#FFF" />
                       <Text style={styles.actionBtnText}>Rejeter</Text>
                     </TouchableOpacity>

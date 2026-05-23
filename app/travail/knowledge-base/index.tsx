@@ -1,9 +1,10 @@
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ScrollView, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import api from '@/services/api-service';
 
 const MOCK_CATEGORIES = [
   { id: 'all', name: 'Tous' },
@@ -44,6 +45,7 @@ export default function KnowledgeBaseScreen() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [articles, setArticles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedArticle, setSelectedArticle] = useState<any>(null);
 
   useEffect(() => {
     const fetchArticles = async () => {
@@ -68,7 +70,7 @@ export default function KnowledgeBaseScreen() {
   const renderArticle = ({ item }: { item: typeof MOCK_ARTICLES[0] }) => (
     <TouchableOpacity 
       style={[styles.articleCard, { backgroundColor: themeColors.cardBackground, borderBottomColor: themeColors.border }]}
-      onPress={() => {/* Voir l'article */}}
+      onPress={() => setSelectedArticle(item)}
     >
       <View style={styles.articleInfo}>
         <View style={styles.articleHeader}>
@@ -95,7 +97,7 @@ export default function KnowledgeBaseScreen() {
           </View>
         </View>
       </View>
-      <TouchableOpacity style={styles.actionBtn}>
+      <TouchableOpacity style={styles.actionBtn} onPress={() => setSelectedArticle(item)}>
         <Ionicons name="chevron-forward" size={20} color={themeColors.textSecondary} />
       </TouchableOpacity>
     </TouchableOpacity>
@@ -112,7 +114,7 @@ export default function KnowledgeBaseScreen() {
           <Text style={styles.headerTitle}>Base de connaissances</Text>
           <TouchableOpacity 
             style={styles.addBtn}
-            onPress={() => router.push('/knowledge-base/create')}
+            onPress={() => router.push('/travail/knowledge-base/create')}
           >
             <Ionicons name="add-circle" size={28} color="#FFCC00" />
           </TouchableOpacity>
@@ -177,6 +179,51 @@ export default function KnowledgeBaseScreen() {
           </View>
         }
       />
+
+      {/* Modal Premium Prévisualisation */}
+      <Modal visible={!!selectedArticle} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: themeColors.cardBackground }]}>
+            {selectedArticle && (
+              <>
+                <View style={styles.modalHeader}>
+                  <View style={[styles.categoryBadge, { backgroundColor: '#FFCC0020' }]}>
+                    <Text style={styles.categoryBadgeText}>{selectedArticle.category}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setSelectedArticle(null)} style={styles.closeBtn}>
+                    <Ionicons name="close-circle" size={28} color={themeColors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+                
+                <Text style={[styles.modalTitle, { color: themeColors.text }]}>{selectedArticle.title}</Text>
+                
+                <View style={styles.modalMetaContainer}>
+                  <View style={styles.modalMetaRow}>
+                    <Ionicons name="person-outline" size={16} color={themeColors.textSecondary} />
+                    <Text style={[styles.modalMetaText, { color: themeColors.textSecondary }]}>
+                      Cible: {selectedArticle.target === 'employee' ? 'Employés' : 'Tous'}
+                    </Text>
+                  </View>
+                  <View style={styles.modalMetaRow}>
+                    <Ionicons name="calendar-outline" size={16} color={themeColors.textSecondary} />
+                    <Text style={[styles.modalMetaText, { color: themeColors.textSecondary }]}>
+                      Créé le: {selectedArticle.date}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={[styles.modalDescriptionBox, { backgroundColor: themeColors.background }]}>
+                  <Text style={[styles.modalDescriptionText, { color: themeColors.text }]}>
+                    Ceci est une description premium détaillée de l'article {selectedArticle.title}.
+                    Vous y trouverez toutes les informations nécessaires pour bien comprendre ce sujet.
+                    Le contenu est stylisé pour une lecture agréable et immersive.
+                  </Text>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -309,4 +356,14 @@ const styles = StyleSheet.create({
     gap: 15,
   },
   emptyText: { fontSize: 16, fontWeight: '600' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, minHeight: 350 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  closeBtn: { padding: 5, marginRight: -5, marginTop: -5 },
+  modalTitle: { fontSize: 24, fontWeight: '800', marginBottom: 20, lineHeight: 32 },
+  modalMetaContainer: { flexDirection: 'row', gap: 20, marginBottom: 25, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)', paddingBottom: 20 },
+  modalMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  modalMetaText: { fontSize: 13, fontWeight: '600' },
+  modalDescriptionBox: { padding: 20, borderRadius: 15 },
+  modalDescriptionText: { fontSize: 15, lineHeight: 24, fontWeight: '500' },
 });

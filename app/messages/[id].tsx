@@ -20,7 +20,7 @@ export default function ChatDetailScreen() {
   const fetchMessages = async () => {
     try {
       const response = await api.get(`/messages/${id}`);
-      setMessages(response.data);
+      setMessages(response.data.data || response.data || []);
     } catch (error) {
       console.error('Erreur chargement messages:', error);
     } finally {
@@ -46,7 +46,8 @@ export default function ChatDetailScreen() {
           message: textToSend
         });
         
-        setMessages(prev => [...prev, response.data]);
+        const newMsg = response.data.data || response.data;
+        setMessages(prev => [...prev, newMsg]);
         setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
       } catch (error) {
         console.error('Erreur envoi message:', error);

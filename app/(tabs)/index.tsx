@@ -2,7 +2,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, RefreshControl, Dimensions, FlatList } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, RefreshControl, Dimensions, FlatList, Alert } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import api from '@/services/api-service';
 import * as SecureStore from 'expo-secure-store';
@@ -135,7 +135,7 @@ export default function HomeScreen() {
           <View style={styles.heroContent}>
             <Text style={styles.heroLabel}>SOLDE DES HONORAIRES</Text>
             <Text style={styles.heroAmount}>{stats.honoraires} <Text style={styles.currency}>FCFA</Text></Text>
-            <TouchableOpacity style={styles.heroBtn}>
+            <TouchableOpacity style={styles.heroBtn} onPress={() => router.push('/finance/factures')}>
               <Text style={styles.heroBtnText}>Consulter les factures</Text>
               <Ionicons name="arrow-forward" size={16} color="#000" />
             </TouchableOpacity>
@@ -180,7 +180,16 @@ export default function HomeScreen() {
             <Text style={[styles.gridLabel, { color: themeColors.text }]}>RH & Paie</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.gridItem, { backgroundColor: themeColors.cardBackground }]} onPress={() => router.push('/customer-requests')}>
+          <TouchableOpacity 
+            style={[styles.gridItem, { backgroundColor: themeColors.cardBackground }]} 
+            onPress={() => {
+              Alert.alert(
+                'Support & Assistance',
+                'Pour toute demande de support ou assistance technique, veuillez soumettre votre requête via notre portail Web ou contacter directement votre administrateur.',
+                [{ text: 'Compris', style: 'default' }]
+              );
+            }}
+          >
             <View style={[styles.gridIcon, { backgroundColor: '#F3E5F5' }]}><Ionicons name="megaphone" size={24} color="#9C27B0" /></View>
             <Text style={[styles.gridLabel, { color: themeColors.text }]}>Support</Text>
           </TouchableOpacity>

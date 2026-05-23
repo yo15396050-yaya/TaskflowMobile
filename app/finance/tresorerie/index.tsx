@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -80,7 +80,7 @@ export default function TresorerieScreen() {
         </View>
         <TouchableOpacity 
           style={styles.detailsBtn}
-          onPress={() => router.push(`/tresorerie/${item.id}`)}
+          onPress={() => router.push(`/finance/tresorerie/${item.id}`)}
         >
           <Text style={styles.detailsBtnText}>Détails</Text>
           <Ionicons name="chevron-forward" size={16} color="#FFCC00" />
@@ -97,7 +97,10 @@ export default function TresorerieScreen() {
             <Ionicons name="arrow-back" size={24} color="#FFCC00" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Trésorerie</Text>
-          <TouchableOpacity style={styles.addBtn}>
+          <TouchableOpacity 
+            style={styles.addBtn}
+            onPress={() => Alert.alert('Accès restreint', "L'ajout ou le raccordement de comptes bancaires / caisses mobiles est réservé aux comptes administrateurs. Veuillez soumettre une requête formelle.")}
+          >
             <Ionicons name="add" size={24} color="#181818" />
           </TouchableOpacity>
         </View>

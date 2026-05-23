@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -97,6 +97,7 @@ export default function EtatsFinanciersScreen() {
   const renderFinancialItem = ({ item }: { item: typeof FINANCIAL_DATA[0] }) => (
     <TouchableOpacity
       style={[styles.card, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}
+      onPress={() => Alert.alert('Résumé des indicateurs', `Budget global alloué : ${formatAmount(item.budget)}\nTotal des factures encaissées : ${formatAmount(item.recettes)}\nCharges cumulées : ${formatAmount(item.depenses)}\nSolde net exact : ${formatAmount(item.solde)}`, [{ text: 'Fermer', style: 'cancel' }])}
     >
       {/* Card Header */}
       <View style={styles.cardTop}>
@@ -232,7 +233,7 @@ export default function EtatsFinanciersScreen() {
             <Ionicons name="arrow-back" size={24} color="#FFCC00" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>États Financiers</Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => Alert.alert('Exportation', 'Préparation du rapport consolidé en cours...')}>
             <Ionicons name="download-outline" size={24} color="#FFCC00" />
           </TouchableOpacity>
         </View>

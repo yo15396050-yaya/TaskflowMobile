@@ -3,7 +3,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
-import { FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator, RefreshControl } from 'react-native';
+import { FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator, RefreshControl, Linking, Alert } from 'react-native';
 import api from '@/services/api-service';
 
 export default function EmployeesScreen() {
@@ -75,13 +75,33 @@ export default function EmployeesScreen() {
       </View>
 
       <View style={styles.cardFooter}>
-        <TouchableOpacity style={styles.actionIcon}>
+        <TouchableOpacity 
+          style={styles.actionIcon}
+          onPress={() => {
+            const phone = item.mobile || item.phone;
+            if (phone) Linking.openURL(`tel:${phone}`);
+            else Alert.alert('Non disponible', 'Aucun numéro de téléphone renseigné.');
+          }}
+        >
           <Ionicons name="call-outline" size={18} color={themeColors.textSecondary} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionIcon}>
+        <TouchableOpacity 
+          style={styles.actionIcon}
+          onPress={() => {
+            if (item.email) Linking.openURL(`mailto:${item.email}`);
+            else Alert.alert('Non disponible', 'Aucune adresse email renseignée.');
+          }}
+        >
           <Ionicons name="mail-outline" size={18} color={themeColors.textSecondary} />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionIcon, { marginLeft: 'auto' }]}>
+        <TouchableOpacity 
+          style={[styles.actionIcon, { marginLeft: 'auto' }]}
+          onPress={() => {
+            const phone = item.mobile || item.phone;
+            if (phone) Linking.openURL(`whatsapp://send?phone=${phone}`);
+            else Alert.alert('Non disponible', 'Aucun numéro de téléphone renseigné pour WhatsApp.');
+          }}
+        >
           <Ionicons name="chatbubble-ellipses-outline" size={18} color="#FFCC00" />
         </TouchableOpacity>
       </View>

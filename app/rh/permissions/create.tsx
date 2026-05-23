@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
 import api from '@/services/api-service';
 
 const LEAVE_TYPES = [

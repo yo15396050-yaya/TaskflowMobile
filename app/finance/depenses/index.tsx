@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl } from 'react-native';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl, Alert, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -55,7 +55,13 @@ export default function ExpensesScreen() {
     return (
       <TouchableOpacity 
         style={[styles.expenseCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}
-        onPress={() => router.push(`/finance/depenses/${item.id}`)}
+        onPress={() => {
+          Alert.alert(
+            item.title || item.reason || 'Détails de la dépense',
+            `Catégorie : ${item.category || item.category_name || 'N/A'}\nMontant : ${item.amount} ${item.currency || 'FCFA'}\nDate : ${item.date || 'N/A'}\nStatut : ${item.status || 'N/A'}\n\nDescription : ${item.description || 'Aucune description fournie.'}`,
+            [{ text: 'Fermer', style: 'cancel' }]
+          );
+        }}
       >
         <View style={styles.cardHeader}>
           <View style={[styles.iconContainer, { backgroundColor: (item.color || '#3498db') + '15' }]}>
@@ -72,7 +78,16 @@ export default function ExpensesScreen() {
         </View>
         
         <View style={styles.cardFooter}>
-           <TouchableOpacity style={styles.receiptBtn}>
+           <TouchableOpacity 
+             style={styles.receiptBtn}
+             onPress={() => {
+               if (item.receipt_url) {
+                 Linking.openURL(item.receipt_url).catch(err => console.error("Erreur ouverture URL", err));
+               } else {
+                 Alert.alert('Aucun justificatif', 'Aucun justificatif numérique n\'est rattaché à cette fiche de frais. Veuillez contacter le service comptabilité.', [{ text: 'Compris', style: 'default' }]);
+               }
+             }}
+           >
               <Ionicons name="document-attach-outline" size={16} color="#888" />
               <Text style={styles.receiptLink}>Voir le reçu</Text>
            </TouchableOpacity>

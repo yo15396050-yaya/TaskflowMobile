@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -7,12 +7,14 @@ import {
   TouchableOpacity, 
   Image,
   Platform,
-  Alert 
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import api from '@/services/api-service';
 
 export default function ProductDetailScreen() {
   const router = useRouter();
@@ -20,22 +22,27 @@ export default function ProductDetailScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const themeColors = Colors[colorScheme];
 
-  // Données factices pour l'exemple (à remplacer par un appel API avec l'ID)
-  const product = {
-    id: id,
-    name: 'Frais du logiciel RH',
-    price: '5 000 FCFA',
-    tax: '--',
-    unitType: '-',
-    hsnSac: '--',
-    sku: '--',
-    category: '--',
-    subCategory: '--',
-    canPurchase: false,
-    isDownloadable: false,
-    description: '--',
-    image: null
+  const [product, setProduct] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchProductDetails = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get(`/services/${id}`);
+      setProduct(response.data);
+    } catch (error) {
+      console.error('Erreur lors du chargement des détails du produit:', error);
+      Alert.alert('Erreur', 'Impossible de récupérer les informations de ce produit.');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    if (id) {
+      fetchProductDetails();
+    }
+  }, [id]);
 
   const handleDelete = () => {
     Alert.alert(
@@ -46,9 +53,14 @@ export default function ProductDetailScreen() {
         { 
           text: "Oui, supprimez-le !", 
           style: "destructive", 
-          onPress: () => {
-            Alert.alert("Supprimé", "Le produit a été supprimé.");
-            router.back();
+          onPress: async () => {
+            try {
+              await api.delete(`/services/${id}`);
+              Alert.alert("Supprimé", "Le produit a été supprimé.");
+              router.back();
+            } catch (e) {
+              Alert.alert('Erreur', 'Impossible de supprimer.');
+            }
           } 
         }
       ]
@@ -67,6 +79,26 @@ export default function ProductDetailScreen() {
       )}
     </View>
   );
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: themeColors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#FFCC00" />
+      </View>
+    );
+  }
+
+  if (!product) {
+    return (
+      <View style={[styles.container, { backgroundColor: themeColors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <Ionicons name="basket-outline" size={60} color="#888" />
+        <Text style={{ color: themeColors.textSecondary, marginTop: 15, fontSize: 16 }}>Produit introuvable</Text>
+        <TouchableOpacity style={[styles.editBtn, { paddingHorizontal: 20, marginTop: 20 }]} onPress={() => router.back()}>
+          <Text style={styles.editBtnText}>Retour</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: themeColors.background }]}>
@@ -120,7 +152,7 @@ export default function ProductDetailScreen() {
         <View style={[styles.card, { backgroundColor: themeColors.cardBackground }]}>
           <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Description</Text>
           <Text style={[styles.description, { color: themeColors.textSecondary }]}>
-            {product.description === '--' ? 'Aucune description fournie.' : product.description}
+            {product.description === '--' || !product.description ? 'Aucune description fournie.' : product.description}
           </Text>
         </View>
 

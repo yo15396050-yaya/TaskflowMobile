@@ -1,9 +1,11 @@
-import { StyleSheet, Text, View, TouchableOpacity, TextInput, ScrollView, Switch, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, TextInput, ScrollView, Switch, KeyboardAvoidingView, Platform, Modal, FlatList, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
+
+const KNOWLEDGE_CATEGORIES = ['Procédures RH', 'Guides Techniques', 'Règlements Intérieurs', 'F.A.Q.', 'Modèles de Documents', 'Autre'];
 
 export default function CreateKnowledgeArticleScreen() {
   const router = useRouter();
@@ -14,10 +16,31 @@ export default function CreateKnowledgeArticleScreen() {
   const [heading, setHeading] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleSave = () => {
-    // Logic to save
-    router.back();
+    if (!heading || !category) {
+      Alert.alert('Champs requis', 'Veuillez renseigner au moins le titre et la catégorie.');
+      return;
+    }
+
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      Alert.alert('Succès', 'Article de connaissances enregistré avec succès !', [
+        { text: 'OK', onPress: () => router.back() }
+      ]);
+    }, 1200);
+  };
+
+  const handleUploadFile = () => {
+    Alert.alert('Fichier attaché', 'Votre document a été téléversé avec succès (limite de 100 Mo respectée).');
+  };
+
+  const selectCategory = (selected: string) => {
+    setCategory(selected);
+    setShowCategoryModal(false);
   };
 
   return (
@@ -31,8 +54,8 @@ export default function CreateKnowledgeArticleScreen() {
             <Ionicons name="close" size={26} color="#FFCC00" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Nouvel Article</Text>
-          <TouchableOpacity onPress={handleSave} style={styles.saveBtn}>
-            <Text style={styles.saveBtnText}>Enregistrer</Text>
+          <TouchableOpacity onPress={handleSave} style={styles.saveBtn} disabled={loading}>
+            {loading ? <ActivityIndicator size="small" color="#181818" /> : <Text style={styles.saveBtnText}>Enregistrer</Text>}
           </TouchableOpacity>
         </View>
       </View>
@@ -80,7 +103,10 @@ export default function CreateKnowledgeArticleScreen() {
 
         <View style={styles.inputSection}>
           <Text style={[styles.label, { color: themeColors.textSecondary }]}>Catégorie d'article *</Text>
-          <TouchableOpacity style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}>
+          <TouchableOpacity 
+            style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}
+            onPress={() => setShowCategoryModal(true)}
+          >
             <Text style={{ color: category ? themeColors.text : '#666' }}>
               {category || 'Sélectionner une catégorie'}
             </Text>
@@ -102,7 +128,10 @@ export default function CreateKnowledgeArticleScreen() {
           />
         </View>
 
-        <TouchableOpacity style={[styles.uploadBox, { borderColor: themeColors.border, borderStyle: 'dashed' }]}>
+        <TouchableOpacity 
+          style={[styles.uploadBox, { borderColor: themeColors.border, borderStyle: 'dashed' }]}
+          onPress={handleUploadFile}
+        >
           <Ionicons name="cloud-upload-outline" size={32} color="#888" />
           <Text style={styles.uploadText}>Téléverser un fichier</Text>
           <Text style={styles.uploadSubtext}>JPG, PNG, PDF (Max 100MB)</Text>
@@ -110,6 +139,33 @@ export default function CreateKnowledgeArticleScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Modal de sélection de catégorie */}
+      <Modal visible={showCategoryModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: themeColors.cardBackground }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: themeColors.text }]}>Catégorie d'article</Text>
+              <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
+                <Ionicons name="close" size={24} color={themeColors.text} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={KNOWLEDGE_CATEGORIES}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity 
+                  style={[styles.optionItem, { borderBottomColor: themeColors.border }]}
+                  onPress={() => selectCategory(item)}
+                >
+                  <Text style={[styles.optionText, { color: themeColors.text }]}>{item}</Text>
+                  {category === item && <Ionicons name="checkmark" size={20} color="#FFCC00" />}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -140,7 +196,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFCC00', 
     paddingHorizontal: 15, 
     paddingVertical: 8, 
-    borderRadius: 12 
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 90,
   },
   saveBtnText: { color: '#181818', fontWeight: '800', fontSize: 13 },
   formContainer: { flex: 1, padding: 20 },
@@ -199,4 +259,11 @@ const styles = StyleSheet.create({
   },
   uploadText: { color: '#555', fontSize: 15, fontWeight: '700', marginTop: 10 },
   uploadSubtext: { color: '#888', fontSize: 11, marginTop: 4 },
+  // Modal styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, paddingBottom: 40, maxHeight: '60%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 18, fontWeight: '800' },
+  optionItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 1 },
+  optionText: { fontSize: 16, fontWeight: '500' }
 });

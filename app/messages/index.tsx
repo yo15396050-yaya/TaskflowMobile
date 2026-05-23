@@ -20,14 +20,14 @@ export default function MessagesScreen() {
   // New conversation modal state
   const [isNewVisible, setIsNewVisible] = useState(false);
   const [userType, setUserType] = useState<'employee' | 'client'>('employee');
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<any>(null);
   const [initialMsg, setInitialMsg] = useState('');
 
   const fetchConversations = async () => {
     try {
       setLoading(true);
       const response = await api.get('/conversations');
-      setConversations(response.data);
+      setConversations(response.data.data || response.data || []);
     } catch (error) {
       console.error('Erreur chargement conversations:', error);
     } finally {
@@ -39,7 +39,11 @@ export default function MessagesScreen() {
   const fetchContacts = async () => {
     try {
       const response = await api.get('/chat-contacts');
-      setContacts(response.data);
+      const data = response.data.data || response.data || { employee: [], client: [] };
+      setContacts({
+        employee: data.employee || [],
+        client: data.client || []
+      });
     } catch (error) {
       console.error('Erreur chargement contacts:', error);
     }
@@ -61,12 +65,9 @@ export default function MessagesScreen() {
   const handleStartConversation = () => {
     if (selectedUserId) {
       const userList = userType === 'employee' ? contacts.employee : contacts.client;
-      const user = userList.find(u => u.id === selectedUserId);
+      const user = userList.find(u => u.id == selectedUserId);
       setIsNewVisible(false);
-      router.push({
-        pathname: '/messages/[id]',
-        params: { id: selectedUserId, name: user?.name || 'Inconnu' }
-      });
+      router.push(`/messages/${selectedUserId}?name=${encodeURIComponent(user?.name || 'Inconnu')}`);
       // Reset state for next time
       setSelectedUserId(null);
       setInitialMsg('');
@@ -76,7 +77,7 @@ export default function MessagesScreen() {
   const renderItem = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={[styles.convItem, { backgroundColor: themeColors.cardBackground, borderBottomColor: themeColors.border }]}
-      onPress={() => router.push({ pathname: '/messages/[id]', params: { id: item.id, name: item.name } })}
+      onPress={() => router.push(`/messages/${item.id}?name=${encodeURIComponent(item.name)}`)}
     >
       <View style={styles.avatarWrapper}>
         <Image source={{ uri: item.avatar }} style={styles.avatar} />
@@ -192,13 +193,13 @@ export default function MessagesScreen() {
                     key={user.id}
                     style={[
                       styles.selectableUser,
-                      selectedUserId === user.id && { borderColor: '#FFCC00', backgroundColor: 'rgba(255,204,0,0.1)' }
+                      selectedUserId == user.id && { borderColor: '#FFCC00', backgroundColor: 'rgba(255,204,0,0.1)' }
                     ]}
                     onPress={() => setSelectedUserId(user.id)}
                   >
                     <Image source={{ uri: user.avatar }} style={styles.userAvatarSmall} />
                     <Text style={[styles.selectableUserName, { color: themeColors.text }]} numberOfLines={1}>{user.name}</Text>
-                    {selectedUserId === user.id && (
+                    {selectedUserId == user.id && (
                       <View style={styles.checkBadge}>
                         <Ionicons name="checkmark" size={12} color="#181818" />
                       </View>
@@ -227,9 +228,9 @@ export default function MessagesScreen() {
                 <Text style={[styles.modalCancelText, { color: themeColors.text }]}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalSubmitBtn, (!selectedUserId || !initialMsg.trim()) && { opacity: 0.5 }]}
+                style={[styles.modalSubmitBtn, !selectedUserId && { opacity: 0.5 }]}
                 onPress={handleStartConversation}
-                disabled={!selectedUserId || !initialMsg.trim()}
+                disabled={!selectedUserId}
               >
                 <Text style={styles.modalSubmitText}>Démarrer</Text>
               </TouchableOpacity>

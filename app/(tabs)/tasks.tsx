@@ -89,7 +89,14 @@ export default function TasksScreen() {
       onPress={() => router.push(`/travail/tasks/${item.id}`)}
       activeOpacity={0.7}
     >
-      <TouchableOpacity style={styles.checkCircle}>
+      <TouchableOpacity 
+        style={styles.checkCircle}
+        onPress={() => {
+          const newStatus = item.status === 'terminé' ? 'en cours' : 'terminé';
+          setTasks(prev => prev.map(t => t.id === item.id ? { ...t, status: newStatus } : t));
+          api.post(`/tasks/${item.id}`, { _method: 'PUT', status: newStatus }).catch(err => console.error("Erreur mise à jour tâche", err));
+        }}
+      >
         <Ionicons
           name={item.status === 'terminé' ? "checkbox" : "square-outline"}
           size={24}

@@ -30,6 +30,11 @@ export default function DocumentsScreen() {
     fetchDocuments();
   }, []);
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchDocuments();
+  };
+
   const downloadDocument = async (id: string, name: string) => {
     const url = `https://dc-knowing.com/tache/public/api/documents/${id}/download`;
     // On ouvre dans le navigateur car le téléchargement direct sur mobile peut nécessiter des permissions complexes

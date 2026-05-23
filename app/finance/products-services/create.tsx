@@ -8,12 +8,19 @@ import {
   TextInput, 
   Switch,
   Alert,
-  Platform
+  Platform,
+  Modal,
+  FlatList,
+  ActivityIndicator
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+
+const CATEGORIES = ['Hébergement Web', 'Matériel Informatique', 'Licence Logiciel', 'Conseil', 'Support Technique', 'Autre'];
+const SUB_CATEGORIES = ['Serveur Dédié', 'VPS', 'Nom de Domaine', 'Poste de Travail', 'Ordinateur Portable', 'Autre'];
+const UNITS = ['Pièce', 'Heure', 'Jour', 'Mois', 'Forfait'];
 
 export default function CreateProductScreen() {
   const router = useRouter();
@@ -28,22 +35,63 @@ export default function CreateProductScreen() {
     subCategory: '',
     tax: '',
     hsnSac: '',
-    unitType: '1',
+    unitType: 'Pièce',
     canPurchase: false,
     isDownloadable: false,
     sku: '',
     description: '',
   });
 
+  const [modalType, setModalType] = useState<null | 'category' | 'subCategory' | 'unitType'>(null);
+  const [loading, setLoading] = useState(false);
+
   const handleSave = () => {
     if (!formData.name || !formData.price) {
-      Alert.alert('Erreur', 'Veuillez remplir les champs obligatoires (*)');
+      Alert.alert('Erreur', 'Veuillez remplir les champs obligatoires (Nom et Prix)');
       return;
     }
     
-    Alert.alert('Succès', 'Produit enregistré avec succès', [
-      { text: 'OK', onPress: () => router.back() }
-    ]);
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      Alert.alert('Succès', 'Produit enregistré avec succès', [
+        { text: 'OK', onPress: () => router.back() }
+      ]);
+    }, 1200);
+  };
+
+  const selectItem = (field: 'category' | 'subCategory' | 'unitType', value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setModalType(null);
+  };
+
+  const handleUploadFile = () => {
+    Alert.alert('Fichier attaché', 'Le fichier téléchargeable a bien été attaché au produit.');
+  };
+
+  const renderModalContent = () => {
+    let data: string[] = [];
+    let field: 'category' | 'subCategory' | 'unitType' = 'category';
+    
+    if (modalType === 'category') { data = CATEGORIES; field = 'category'; }
+    else if (modalType === 'subCategory') { data = SUB_CATEGORIES; field = 'subCategory'; }
+    else if (modalType === 'unitType') { data = UNITS; field = 'unitType'; }
+
+    return (
+      <FlatList
+        data={data}
+        keyExtractor={(item) => item}
+        renderItem={({ item }) => (
+          <TouchableOpacity 
+            style={[styles.optionItem, { borderBottomColor: themeColors.border }]}
+            onPress={() => selectItem(field, item)}
+          >
+            <Text style={[styles.optionText, { color: themeColors.text }]}>{item}</Text>
+            {formData[field] === item && <Ionicons name="checkmark" size={20} color="#FFCC00" />}
+          </TouchableOpacity>
+        )}
+      />
+    );
   };
 
   return (
@@ -55,7 +103,9 @@ export default function CreateProductScreen() {
             <Ionicons name="arrow-back" size={24} color="#FFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Ajouter des produits</Text>
-          <View style={{ width: 40 }} />
+          <TouchableOpacity onPress={handleSave} disabled={loading}>
+             {loading ? <ActivityIndicator size="small" color="#FFCC00" /> : <Ionicons name="checkmark-circle" size={28} color="#FFCC00" />}
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -95,7 +145,10 @@ export default function CreateProductScreen() {
             {/* Catégorie */}
             <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
               <Text style={[styles.label, { color: themeColors.textSecondary }]}>Catégorie</Text>
-              <TouchableOpacity style={[styles.selectBtn, { borderColor: themeColors.border }]}>
+              <TouchableOpacity 
+                style={[styles.selectBtn, { borderColor: themeColors.border }]}
+                onPress={() => setModalType('category')}
+              >
                 <Text style={{ color: formData.category ? themeColors.text : '#999' }}>
                   {formData.category || 'Choisir...'}
                 </Text>
@@ -106,7 +159,10 @@ export default function CreateProductScreen() {
             {/* Sous-catégorie */}
             <View style={[styles.inputGroup, { flex: 1 }]}>
               <Text style={[styles.label, { color: themeColors.textSecondary }]}>Sous-catégorie</Text>
-              <TouchableOpacity style={[styles.selectBtn, { borderColor: themeColors.border }]}>
+              <TouchableOpacity 
+                style={[styles.selectBtn, { borderColor: themeColors.border }]}
+                onPress={() => setModalType('subCategory')}
+              >
                 <Text style={{ color: formData.subCategory ? themeColors.text : '#999' }}>
                   {formData.subCategory || 'Choisir...'}
                 </Text>
@@ -144,8 +200,11 @@ export default function CreateProductScreen() {
           {/* Unit Type */}
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: themeColors.textSecondary }]}>Type d'unité</Text>
-            <TouchableOpacity style={[styles.selectBtn, { borderColor: themeColors.border }]}>
-              <Text style={{ color: themeColors.text }}>Unité par défaut</Text>
+            <TouchableOpacity 
+              style={[styles.selectBtn, { borderColor: themeColors.border }]}
+              onPress={() => setModalType('unitType')}
+            >
+              <Text style={{ color: themeColors.text }}>{formData.unitType}</Text>
               <Ionicons name="chevron-down" size={20} color={themeColors.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -182,7 +241,7 @@ export default function CreateProductScreen() {
           </View>
 
           {formData.isDownloadable && (
-            <TouchableOpacity style={styles.uploadBox}>
+            <TouchableOpacity style={styles.uploadBox} onPress={handleUploadFile}>
               <Ionicons name="cloud-upload-outline" size={32} color="#FFCC00" />
               <Text style={styles.uploadText}>Choisir le fichier téléchargeable</Text>
             </TouchableOpacity>
@@ -203,12 +262,27 @@ export default function CreateProductScreen() {
           />
         </View>
 
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-          <Text style={styles.saveBtnText}>Sauvegarder</Text>
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={loading}>
+          {loading ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>Sauvegarder</Text>}
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Modal de sélection universel */}
+      <Modal visible={modalType !== null} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: themeColors.cardBackground }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: themeColors.text }]}>Sélectionner</Text>
+              <TouchableOpacity onPress={() => setModalType(null)}>
+                <Ionicons name="close" size={24} color={themeColors.text} />
+              </TouchableOpacity>
+            </View>
+            {renderModalContent()}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -298,4 +372,11 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   saveBtnText: { color: '#000', fontSize: 16, fontWeight: '800' },
+  // Modal styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, paddingBottom: 40, maxHeight: '60%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 18, fontWeight: '800' },
+  optionItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 1 },
+  optionText: { fontSize: 16, fontWeight: '500' }
 });

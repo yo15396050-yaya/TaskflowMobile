@@ -1,9 +1,12 @@
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput, Switch } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput, Switch, Modal, FlatList, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
+
+const MOCK_CLIENTS = ['2N IMMOBILIER', '5 PAINS 2 POISSONS', 'A & I VENTURE', 'AFRICA MOOV', 'AIG SA'];
+const CONTRACT_TYPES = ['Prestation de Services', 'Contrat de Travail', 'Accord de Confidentialité (NDA)', 'Maintenance', 'Autre'];
 
 export default function CreateContractScreen() {
   const router = useRouter();
@@ -21,6 +24,51 @@ export default function CreateContractScreen() {
     description: '',
   });
 
+  const [modalType, setModalType] = useState<null | 'client' | 'type'>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSave = () => {
+    if (!form.client || !form.subject || !form.startDate) {
+      Alert.alert('Erreur', 'Veuillez remplir les champs obligatoires (Client, Objet et Date de début).');
+      return;
+    }
+
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      Alert.alert('Succès', 'Contrat enregistré avec succès !', [
+        { text: 'OK', onPress: () => router.back() }
+      ]);
+    }, 1500);
+  };
+
+  const selectItem = (field: 'client' | 'contractType', value: string) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+    setModalType(null);
+  };
+
+  const renderModalContent = () => {
+    const isClient = modalType === 'client';
+    const data = isClient ? MOCK_CLIENTS : CONTRACT_TYPES;
+    const field = isClient ? 'client' : 'contractType';
+
+    return (
+      <FlatList
+        data={data}
+        keyExtractor={(item) => item}
+        renderItem={({ item }) => (
+          <TouchableOpacity 
+            style={[styles.optionItem, { borderBottomColor: themeColors.border }]}
+            onPress={() => selectItem(field, item)}
+          >
+            <Text style={[styles.optionText, { color: themeColors.text }]}>{item}</Text>
+            {form[field] === item && <Ionicons name="checkmark" size={20} color="#FFCC00" />}
+          </TouchableOpacity>
+        )}
+      />
+    );
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: themeColors.background }]}>
       {/* Header */}
@@ -30,7 +78,9 @@ export default function CreateContractScreen() {
             <Ionicons name="arrow-back" size={24} color="#FFCC00" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Ajouter un contrat</Text>
-          <View style={{ width: 24 }} />
+          <TouchableOpacity onPress={handleSave} disabled={loading}>
+             {loading ? <ActivityIndicator size="small" color="#FFCC00" /> : <Ionicons name="checkmark-circle" size={28} color="#FFCC00" />}
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -58,7 +108,10 @@ export default function CreateContractScreen() {
             <Text style={[styles.label, { color: themeColors.textSecondary }]}>
               Client <Text style={styles.required}>*</Text>
             </Text>
-            <TouchableOpacity style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}>
+            <TouchableOpacity 
+              style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}
+              onPress={() => setModalType('client')}
+            >
               <Text style={[styles.selectText, { color: form.client ? themeColors.text : '#aaa' }]}>
                 {form.client || 'Sélectionner'}
               </Text>
@@ -85,7 +138,10 @@ export default function CreateContractScreen() {
         <View style={styles.row}>
           <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
             <Text style={[styles.label, { color: themeColors.textSecondary }]}>Type de contrat</Text>
-            <TouchableOpacity style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}>
+            <TouchableOpacity 
+              style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}
+              onPress={() => setModalType('type')}
+            >
               <Text style={[styles.selectText, { color: form.contractType ? themeColors.text : '#aaa' }]}>
                 {form.contractType || 'Sélectionner'}
               </Text>
@@ -115,18 +171,30 @@ export default function CreateContractScreen() {
             <Text style={[styles.label, { color: themeColors.textSecondary }]}>
               Date de début <Text style={styles.required}>*</Text>
             </Text>
-            <TouchableOpacity style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}>
-              <Text style={[styles.selectText, { color: '#ccc' }]}>Sélectionner</Text>
+            <View style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}>
+              <TextInput
+                style={[styles.selectText, { color: themeColors.text, flex: 1 }]}
+                placeholder="JJ/MM/AAAA"
+                placeholderTextColor="#aaa"
+                value={form.startDate}
+                onChangeText={(t) => setForm({...form, startDate: t})}
+              />
               <Ionicons name="calendar-outline" size={20} color={themeColors.textSecondary} />
-            </TouchableOpacity>
+            </View>
           </View>
 
           <View style={[styles.inputGroup, { flex: 1 }]}>
             <Text style={[styles.label, { color: themeColors.textSecondary }]}>Date de fin</Text>
-            <TouchableOpacity style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}>
-              <Text style={[styles.selectText, { color: '#ccc' }]}>Sélectionner</Text>
+            <View style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}>
+              <TextInput
+                style={[styles.selectText, { color: themeColors.text, flex: 1 }]}
+                placeholder="JJ/MM/AAAA"
+                placeholderTextColor="#aaa"
+                value={form.endDate}
+                onChangeText={(t) => setForm({...form, endDate: t})}
+              />
               <Ionicons name="calendar-outline" size={20} color={themeColors.textSecondary} />
-            </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -144,10 +212,31 @@ export default function CreateContractScreen() {
           />
         </View>
 
-        <TouchableOpacity style={styles.submitBtn}>
-          <Text style={styles.submitBtnText}>Enregistrer le contrat</Text>
+        <TouchableOpacity 
+          style={[styles.submitBtn, { opacity: loading ? 0.7 : 1 }]} 
+          onPress={handleSave}
+          disabled={loading}
+        >
+          {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitBtnText}>Enregistrer le contrat</Text>}
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Modal de sélection universel */}
+      <Modal visible={modalType !== null} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: themeColors.cardBackground }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: themeColors.text }]}>
+                {modalType === 'client' ? 'Sélectionner un Client' : 'Sélectionner un type de contrat'}
+              </Text>
+              <TouchableOpacity onPress={() => setModalType(null)}>
+                <Ionicons name="close" size={24} color={themeColors.text} />
+              </TouchableOpacity>
+            </View>
+            {renderModalContent()}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -176,4 +265,11 @@ const styles = StyleSheet.create({
   inputArea: { height: 120, borderWidth: 1, borderRadius: 15, paddingHorizontal: 15, paddingTop: 15, fontSize: 15, fontWeight: '500', textAlignVertical: 'top' },
   submitBtn: { backgroundColor: '#3498db', height: 60, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginTop: 10, elevation: 3 },
   submitBtnText: { color: '#FFF', fontSize: 16, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, paddingBottom: 40, maxHeight: '60%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 18, fontWeight: '800' },
+  optionItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 1 },
+  optionText: { fontSize: 16, fontWeight: '500' }
 });
