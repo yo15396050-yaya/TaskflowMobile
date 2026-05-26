@@ -1,10 +1,24 @@
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput, Image, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Ionicons } from '@expo/vector-icons';
-import { useState, useRef, useEffect } from 'react';
 import api from '@/services/api-service';
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
+// Fonction pour nettoyer le HTML
+const cleanHtmlText = (text: string): string => {
+  if (!text) return '';
+  return text
+    .replace(/<[^>]*>/g, '') // Retirer toutes les balises HTML
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .trim();
+};
 
 export default function ChatDetailScreen() {
   const { id, name, avatar } = useLocalSearchParams();
@@ -108,7 +122,7 @@ export default function ChatDetailScreen() {
                 ]}
               >
                 <Text style={[styles.bubbleText, { color: msg.isMine ? '#181818' : themeColors.text }]}>
-                  {msg.text}
+                  {cleanHtmlText(msg.text)}
                 </Text>
                 <Text style={[styles.bubbleTime, { color: msg.isMine ? 'rgba(0,0,0,0.5)' : themeColors.textSecondary }]}>
                   {msg.time}

@@ -1,10 +1,11 @@
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import api from '@/services/api-service';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
-import { Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 type TabType = 'profile' | 'emergency' | 'documents';
 
@@ -176,6 +177,15 @@ export default function ProfileSettingsScreen() {
                 thumbColor={emailNotifs ? '#FFF' : '#f4f3f4'}
               />
             </View>
+
+            <TouchableOpacity 
+              style={[styles.userListBtn, { backgroundColor: '#FFCC00', marginTop: 20 }]}
+              onPress={() => router.push('/user/all-users')}
+            >
+              <Ionicons name="people" size={20} color="#181818" />
+              <Text style={styles.userListBtnText}>Voir tous les utilisateurs</Text>
+              <Ionicons name="chevron-forward" size={20} color="#181818" />
+            </TouchableOpacity>
           </View>
         );
       case 'emergency':
@@ -527,4 +537,18 @@ const styles = StyleSheet.create({
   modalSaveBtnText: { color: '#FFF', fontSize: 15, fontWeight: '700' },
   sectionTitle: { fontSize: 16, fontWeight: '800' },
   card: { elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+  userListBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: 15,
+    elevation: 3,
+    shadowColor: '#FFCC00',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  userListBtnText: { color: '#181818', fontSize: 16, fontWeight: '800', flex: 1, textAlign: 'center' },
 });

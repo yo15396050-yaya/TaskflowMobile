@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl, Alert, Linking } from 'react-native';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl, Alert, Linking, Modal, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -49,19 +49,27 @@ export default function ExpensesScreen() {
     (item.category || item.category_name || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const [selectedExpense, setSelectedExpense] = useState<any>(null);
+
+  const getStatusDetails = (status: string) => {
+    switch (status) {
+      case 'Payé':
+      case 'Approuvé':
+        return { color: '#2ecc71', bg: 'rgba(46, 204, 113, 0.1)', icon: 'checkmark-circle' };
+      case 'Rejeté':
+        return { color: '#e74c3c', bg: 'rgba(231, 76, 60, 0.1)', icon: 'close-circle' };
+      default:
+        return { color: '#f39c12', bg: 'rgba(243, 156, 18, 0.1)', icon: 'time' };
+    }
+  };
+
   const renderExpense = ({ item }: { item: any }) => {
-    const statusColor = item.status === 'Payé' || item.status === 'Approuvé' ? '#27ae60' : item.status === 'Rejeté' ? '#e74c3c' : '#f39c12';
+    const statusInfo = getStatusDetails(item.status);
     
     return (
       <TouchableOpacity 
         style={[styles.expenseCard, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}
-        onPress={() => {
-          Alert.alert(
-            item.title || item.reason || 'Détails de la dépense',
-            `Catégorie : ${item.category || item.category_name || 'N/A'}\nMontant : ${item.amount} ${item.currency || 'FCFA'}\nDate : ${item.date || 'N/A'}\nStatut : ${item.status || 'N/A'}\n\nDescription : ${item.description || 'Aucune description fournie.'}`,
-            [{ text: 'Fermer', style: 'cancel' }]
-          );
-        }}
+        onPress={() => setSelectedExpense(item)}
       >
         <View style={styles.cardHeader}>
           <View style={[styles.iconContainer, { backgroundColor: (item.color || '#3498db') + '15' }]}>
@@ -73,7 +81,9 @@ export default function ExpensesScreen() {
           </View>
           <View style={styles.amountContainer}>
               <Text style={[styles.amountText, { color: themeColors.text }]}>{item.amount} {item.currency || 'FCFA'}</Text>
-              <Text style={[styles.statusText, { color: statusColor }]}>{item.status}</Text>
+              <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
+                <Text style={[styles.statusText, { color: statusInfo.color }]}>{item.status}</Text>
+              </View>
           </View>
         </View>
         
@@ -148,6 +158,132 @@ export default function ExpensesScreen() {
             )
         }
       />
+
+      {/* MODAL DES DETAILS DE LA DEPENSE */}
+      <Modal
+        visible={selectedExpense !== null}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setSelectedExpense(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: themeColors.cardBackground }]}>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: themeColors.text }]}>Détails de la Dépense</Text>
+              <TouchableOpacity onPress={() => setSelectedExpense(null)} style={styles.closeBtn}>
+                <Ionicons name="close" size={24} color={themeColors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedExpense && (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
+                {/* Catégorie & Date Header */}
+                <View style={styles.detailCategoryHeader}>
+                  <View style={[styles.detailIconContainer, { backgroundColor: (selectedExpense.color || '#3498db') + '15' }]}>
+                    <Ionicons name={(selectedExpense.icon || 'receipt-outline') as any} size={28} color={selectedExpense.color || '#3498db'} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.detailCategoryName, { color: themeColors.text }]}>
+                      {selectedExpense.category || selectedExpense.category_name || 'Autre'}
+                    </Text>
+                    <Text style={{ fontSize: 13, color: '#888', fontWeight: '500', marginTop: 2 }}>
+                      Enregistré le {selectedExpense.date}
+                    </Text>
+                  </View>
+                  <View style={[styles.detailStatusBadge, { backgroundColor: getStatusDetails(selectedExpense.status).bg }]}>
+                    <Text style={[styles.detailStatusText, { color: getStatusDetails(selectedExpense.status).color }]}>
+                      {selectedExpense.status || 'En attente'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Titre / Raison */}
+                <Text style={[styles.detailTitleText, { color: themeColors.text }]}>
+                  {selectedExpense.title || selectedExpense.reason}
+                </Text>
+
+                {/* Montant Highlighted Box */}
+                <View style={[styles.detailAmountBox, { backgroundColor: themeColors.background, borderColor: themeColors.border }]}>
+                  <Text style={styles.detailAmountLabel}>MONTANT PAYÉ</Text>
+                  <Text style={[styles.detailAmountVal, { color: themeColors.accent }]}>
+                    {parseFloat(selectedExpense.amount || '0').toLocaleString()} <Text style={styles.detailAmountCurrency}>FCFA</Text>
+                  </Text>
+                </View>
+
+                {/* Métadonnées Grid */}
+                <View style={styles.metaGrid}>
+                  <View style={[styles.metaCard, { backgroundColor: themeColors.background, borderColor: themeColors.border }]}>
+                    <Ionicons name="card-outline" size={20} color="#FFCC00" style={{ marginBottom: 6 }} />
+                    <Text style={styles.metaCardLabel}>Mode de Paiement</Text>
+                    <Text style={[styles.metaCardVal, { color: themeColors.text }]} numberOfLines={1}>
+                      {selectedExpense.paymentMode || selectedExpense.payment_method || 'Espèces'}
+                    </Text>
+                  </View>
+
+                  <View style={[styles.metaCard, { backgroundColor: themeColors.background, borderColor: themeColors.border }]}>
+                    <Ionicons name="briefcase-outline" size={20} color="#FFCC00" style={{ marginBottom: 6 }} />
+                    <Text style={styles.metaCardLabel}>Projet / Diligence</Text>
+                    <Text style={[styles.metaCardVal, { color: themeColors.text }]} numberOfLines={1}>
+                      {selectedExpense.project || selectedExpense.project_name || 'Non spécifié'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Description */}
+                <View style={styles.descSection}>
+                  <Text style={styles.sectionLabel}>Description / Notes</Text>
+                  <View style={[styles.descBox, { backgroundColor: themeColors.background, borderColor: themeColors.border }]}>
+                    <Text style={[styles.descText, { color: themeColors.text }]}>
+                      {selectedExpense.description || 'Aucune note ou description additionnelle rattachée à cette note de frais.'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Justificatif */}
+                <View style={styles.receiptSection}>
+                  <Text style={styles.sectionLabel}>Justificatif de Dépense</Text>
+                  {selectedExpense.receipt_url ? (
+                    <TouchableOpacity 
+                      style={[styles.receiptAttachmentCard, { backgroundColor: themeColors.background, borderColor: themeColors.border }]}
+                      onPress={() => {
+                        Linking.openURL(selectedExpense.receipt_url).catch(err => console.error("Erreur ouverture URL", err));
+                      }}
+                    >
+                      <View style={styles.receiptAttachIconBg}>
+                        <Ionicons name="document-text" size={24} color="#000" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.receiptAttachName, { color: themeColors.text }]} numberOfLines={1}>
+                          {selectedExpense.receipt_name || 'facture_' + selectedExpense.id + '.pdf'}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
+                          Cliquez pour ouvrir le document justificatif
+                        </Text>
+                      </View>
+                      <Ionicons name="cloud-download-outline" size={20} color={themeColors.textSecondary} />
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={[styles.noReceiptBox, { backgroundColor: themeColors.background, borderColor: themeColors.border }]}>
+                      <Ionicons name="warning-outline" size={24} color="#888" />
+                      <Text style={styles.noReceiptText}>Aucun reçu ou facture rattaché</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Action button */}
+                <TouchableOpacity 
+                  style={styles.modalCloseBtn}
+                  onPress={() => setSelectedExpense(null)}
+                >
+                  <Text style={styles.modalCloseBtnText}>Fermer les détails</Text>
+                </TouchableOpacity>
+
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -233,4 +369,202 @@ const styles = StyleSheet.create({
   },
   receiptBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   receiptLink: { fontSize: 12, color: '#888', fontWeight: '700' },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  
+  // Modal details styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 35,
+    borderTopRightRadius: 35,
+    maxHeight: '90%',
+    padding: 25,
+    paddingBottom: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 15,
+    elevation: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 10,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  closeBtn: {
+    padding: 5,
+  },
+  detailCategoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15,
+    marginBottom: 25,
+  },
+  detailIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailCategoryName: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  detailStatusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  detailStatusText: {
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  detailTitleText: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 20,
+    lineHeight: 25,
+  },
+  detailAmountBox: {
+    padding: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginBottom: 25,
+  },
+  detailAmountLabel: {
+    fontSize: 11,
+    color: '#888',
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    marginBottom: 8,
+  },
+  detailAmountVal: {
+    fontSize: 30,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  detailAmountCurrency: {
+    fontSize: 16,
+    color: '#888',
+    fontWeight: '700',
+  },
+  metaGrid: {
+    flexDirection: 'row',
+    gap: 15,
+    marginBottom: 25,
+  },
+  metaCard: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 18,
+    borderWidth: 1,
+  },
+  metaCardLabel: {
+    fontSize: 10,
+    color: '#888',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  metaCardVal: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  descSection: {
+    marginBottom: 25,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    color: '#888',
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 10,
+    marginLeft: 5,
+  },
+  descBox: {
+    padding: 15,
+    borderRadius: 18,
+    borderWidth: 1,
+  },
+  descText: {
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: '500',
+  },
+  receiptSection: {
+    marginBottom: 30,
+  },
+  receiptAttachmentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 15,
+  },
+  receiptAttachIconBg: {
+    width: 46,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: '#FFCC00',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  receiptAttachName: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  noReceiptBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 18,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  noReceiptText: {
+    fontSize: 14,
+    color: '#888',
+    fontWeight: '600',
+  },
+  modalCloseBtn: {
+    backgroundColor: '#FFCC00',
+    height: 60,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  modalCloseBtnText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
 });

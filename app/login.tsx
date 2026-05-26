@@ -1,23 +1,23 @@
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import api from '@/services/api-service';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import React, { useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  Image,
-  Alert,
-  ActivityIndicator,
+    ActivityIndicator,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import api from '@/services/api-service';
-import * as SecureStore from 'expo-secure-store';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -47,22 +47,29 @@ export default function LoginScreen() {
       const { token, user } = response.data;
       
       // On crée un objet utilisateur épuré pour éviter l'erreur de taille SecureStore (> 2048 octets)
+      const roles = Array.isArray(user.roles) ? user.roles.map((role: any) => role.name) : [];
       const minimalUser = {
         id: user.id,
         name: user.name,
         email: user.email,
-        avatar: user.image_url || user.avatar_url,
-        role: user.roles?.[0]?.name || 'employé'
+        avatar: user.image_url || user.avatar || user.avatar_url || null,
+        roles: roles,
+        role: roles[0] || 'employé',
+        isAdmin: roles.includes('admin') || roles.includes('administrateur') || false
       };
       
       // Stockage sécurisé du token et des infos user épurées
-      const cleanToken = token.trim();
+      const cleanToken = token?.trim?.() || '';
       await SecureStore.setItemAsync('user_token', cleanToken);
       await SecureStore.setItemAsync('user_data', JSON.stringify(minimalUser));
       
       console.log('Login réussi', { user: minimalUser, token: cleanToken });
 
-      router.replace('/(tabs)');
+      if (minimalUser.isAdmin) {
+        router.replace('/admin');
+      } else {
+        router.replace('/(tabs)');
+      }
     } catch (error: any) {
       console.error('Erreur de connexion', error.response?.data || error.message);
       
@@ -362,3 +369,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+

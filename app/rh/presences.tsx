@@ -5,6 +5,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '@/services/api-service';
+import * as SecureStore from 'expo-secure-store';
 
 export default function AttendanceScreen() {
   const router = useRouter();
@@ -17,18 +18,97 @@ export default function AttendanceScreen() {
   const [isClockedIn, setIsClockedIn] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [userName, setUserName] = useState<string>('Utilisateur');
 
-  // Mise à jour de l'horloge chaque seconde
+  // Mise a jour de l'horloge chaque seconde
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  // Recuperer le nom de l'utilisateur depuis SecureStore
+  useEffect(() => {
+    const loadUserName = async () => {
+      try {
+        const userData = await SecureStore.getItemAsync('user_data');
+        if (userData) {
+          const user = JSON.parse(userData);
+          setUserName(user.name || 'Utilisateur');
+        }
+      } catch (error) {
+        console.error('Erreur chargement userName:', error);
+      }
+    };
+    loadUserName();
+  }, []);
+
+  const formatTimeString = (value?: string | null) => {
+    if (!value) {
+      return '';
+    }
+
+    let raw = String(value).trim();
+    raw = raw.replace(/h/i, ':').replace(/\s+/g, '');
+
+    const timeMatch = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+    if (timeMatch) {
+      const hour = timeMatch[1].padStart(2, '0');
+      const minute = timeMatch[2];
+      return `${hour}:${minute}`;
+    }
+
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    return raw;
+  };
+
+  const computeDuration = (start?: string, end?: string) => {
+    if (!start || !end) {
+      return null;
+    }
+
+    const toMinutes = (time: string) => {
+      const [hours, minutes] = time.split(':').map(Number);
+      if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+        return null;
+      }
+      return hours * 60 + minutes;
+    };
+
+    const startMinutes = toMinutes(formatTimeString(start));
+    const endMinutes = toMinutes(formatTimeString(end));
+    if (startMinutes === null || endMinutes === null || endMinutes < startMinutes) {
+      return null;
+    }
+
+    const diff = endMinutes - startMinutes;
+    const hours = Math.floor(diff / 60);
+    const minutes = diff % 60;
+    return `${hours}h${minutes.toString().padStart(2, '0')}`;
+  };
+
   const fetchAttendanceData = async () => {
     try {
       const response = await api.get('/attendances');
-      setHistory(response.data.history || []);
-      setIsClockedIn(response.data.active || false);
+      const attendanceData = response.data || {};
+      const rawHistory = Array.isArray(attendanceData.history) ? attendanceData.history : [];
+      const formattedHistory = rawHistory.map((item: any) => {
+        const inTime = formatTimeString(item.in || item.check_in || item.start_time);
+        const outTime = formatTimeString(item.out || item.check_out || item.end_time);
+        return {
+          ...item,
+          userName: item.userName || item.name || item.nom || '',
+          in: inTime || '--:--',
+          out: outTime || '--:--',
+          total: item.total && item.total !== 'N/A' ? item.total : computeDuration(inTime, outTime) || 'En cours',
+        };
+      });
+
+      setHistory(formattedHistory);
+      setIsClockedIn(attendanceData.active || false);
     } catch (error) {
       console.error('Erreur presences:', error);
     } finally {
@@ -48,13 +128,27 @@ export default function AttendanceScreen() {
 
   const handleClockAction = async () => {
     setSubmitting(true);
+    const wasClocked = isClockedIn;
     try {
-      const response = await api.post('/clock-in-out');
-      Alert.alert('Succès', response.data.message);
-      fetchAttendanceData(); // Rafraîchir après action
+      await api.post('/clock-in-out');
+      const time = currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+      // Attendre que le backend ait le temps de traiter
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Rafraichir l'historique AVANT d'afficher le message
+      await fetchAttendanceData();
+
+      const successMessage = wasClocked
+        ? `Votre depart a ete enregistre a ${time}. Bonne fin de journee !`
+        : `Votre arrivee a ete enregistree a ${time}. Bonne journee !`;
+      Alert.alert(
+        wasClocked ? 'Depart confirme' : 'Arrivee confirmee',
+        successMessage
+      );
     } catch (error) {
       console.error('Erreur pointage:', error);
-      Alert.alert('Erreur', 'Impossible de valider le pointage.');
+      Alert.alert('Erreur', 'Impossible de valider le pointage. Veuillez reessayer.');
     } finally {
       setSubmitting(false);
     }
@@ -68,7 +162,7 @@ export default function AttendanceScreen() {
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={themeColors.accent} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Présence & Pointage</Text>
+          <Text style={styles.headerTitle}>Presence & Pointage</Text>
           <View style={{ width: 24 }} />
         </View>
 
@@ -108,7 +202,7 @@ export default function AttendanceScreen() {
                   color={isClockedIn ? '#fff' : '#000'} 
                 />
                 <Text style={[styles.clockBtnText, { color: isClockedIn ? '#fff' : '#000' }]}>
-                  {isClockedIn ? 'Départ' : 'Arrivée'}
+                  {isClockedIn ? 'Depart' : 'Arrivee'}
                 </Text>
               </>
             )}
@@ -131,25 +225,44 @@ export default function AttendanceScreen() {
           ) : history.length > 0 ? (
             history.map(log => (
               <View key={log.id} style={[styles.logItem, { backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }]}>
-                <View style={styles.logDateBox}>
-                  <Text style={[styles.logDate, { color: themeColors.text }]}>{log.date}</Text>
-                  <Text style={styles.logTotal}>{log.total}</Text>
+                {/* En-tete: Nom utilisateur et date */}
+                <View style={styles.logHeader}>
+                  <View style={styles.userInfo}>
+                    <Ionicons name="person-circle" size={24} color={themeColors.accent} />
+                    <View style={styles.userDetails}>
+                      <Text style={[styles.userName, { color: themeColors.text }]}>{log.userName || userName}</Text>
+                      <Text style={[styles.logDate, { color: themeColors.secondaryText }]}>{log.date}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.totalDuration}>
+                    <Text style={styles.durationLabel}>Duree</Text>
+                    <Text style={[styles.logTotal, { color: themeColors.text }]}>{log.total || 'En cours'}</Text>
+                  </View>
                 </View>
+                
+                {/* Heures d'entree et sortie */}
                 <View style={styles.logTimeRow}>
-                  <View style={styles.timeTag}>
-                    <Text style={styles.timeLabel}>IN</Text>
+                  <View style={[styles.timeCard, { backgroundColor: themeColors.background }]}>
+                    <View style={styles.timeTagRow}>
+                      <Ionicons name="log-in" size={18} color="#2ecc71" />
+                      <Text style={[styles.timeLabel, { color: themeColors.secondaryText }]}>Entree</Text>
+                    </View>
                     <Text style={[styles.timeValue, { color: themeColors.text }]}>{log.in}</Text>
                   </View>
-                  <View style={styles.timeTag}>
-                    <Text style={styles.timeLabel}>OUT</Text>
-                    <Text style={[styles.timeValue, { color: themeColors.text }]}>{log.out}</Text>
+                  
+                  <View style={[styles.timeCard, { backgroundColor: themeColors.background }]}>
+                    <View style={styles.timeTagRow}>
+                      <Ionicons name="log-out" size={18} color="#e74c3c" />
+                      <Text style={[styles.timeLabel, { color: themeColors.secondaryText }]}>Sortie</Text>
+                    </View>
+                    <Text style={[styles.timeValue, { color: themeColors.text }]}>{log.out || '--:--'}</Text>
                   </View>
                 </View>
               </View>
             ))
           ) : (
             <Text style={{ textAlign: 'center', color: themeColors.textSecondary, marginTop: 20 }}>
-              Aucun historique trouvé.
+              Aucun historique trouve.
             </Text>
           )}
         </View>
@@ -208,19 +321,71 @@ const styles = StyleSheet.create({
   historySection: { padding: 25 },
   sectionTitle: { fontSize: 18, fontWeight: '900', marginBottom: 20 },
   logItem: {
+    padding: 18,
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  logHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 18,
-    borderRadius: 22,
-    borderWidth: 1,
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  logDateBox: { gap: 2 },
-  logDate: { fontSize: 14, fontWeight: '700' },
-  logTotal: { fontSize: 12, color: '#FFCC00', fontWeight: '800' },
-  logTimeRow: { flexDirection: 'row', gap: 15 },
-  timeTag: { alignItems: 'center' },
-  timeLabel: { fontSize: 10, color: '#AAA', fontWeight: '800', marginBottom: 2 },
-  timeValue: { fontSize: 14, fontWeight: '800' },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
+  },
+  userDetails: {
+    justifyContent: 'center',
+  },
+  userName: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  logDate: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  totalDuration: {
+    alignItems: 'flex-end',
+  },
+  durationLabel: {
+    fontSize: 11,
+    color: '#999',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  logTotal: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFCC00',
+  },
+  logTimeRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  timeCard: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'flex-start',
+  },
+  timeTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  timeLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  timeValue: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
 });

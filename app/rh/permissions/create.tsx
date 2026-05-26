@@ -24,6 +24,80 @@ export default function CreatePermissionScreen() {
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Custom Calendar state
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [activeDateField, setActiveDateField] = useState<'start' | 'end' | null>(null);
+
+  const getLeaveTypeDetails = (type: string) => {
+    switch (type) {
+      case 'Congé Annuel': return { icon: 'calendar-outline', color: '#3498db' };
+      case 'Permission Maladie': return { icon: 'medical-outline', color: '#e74c3c' };
+      case 'Urgence Personnelle': return { icon: 'alert-circle-outline', color: '#e67e22' };
+      case 'Congé Maternité/Paternité': return { icon: 'people-outline', color: '#9b59b6' };
+      case 'Formation': return { icon: 'school-outline', color: '#2ecc71' };
+      default: return { icon: 'help-circle-outline', color: '#95a5a6' };
+    }
+  };
+
+  const generateDaysOfMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDayIndex = new Date(year, month, 1).getDay(); // 0 = Sunday, 1 = Monday
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const totalDaysPrevMonth = new Date(year, month, 0).getDate();
+
+    const days = [];
+    const startDay = firstDayIndex === 0 ? 6 : firstDayIndex - 1; // Align to Monday start
+    
+    for (let i = startDay - 1; i >= 0; i--) {
+      days.push({
+        day: totalDaysPrevMonth - i,
+        isCurrentMonth: false,
+        date: new Date(year, month - 1, totalDaysPrevMonth - i)
+      });
+    }
+
+    for (let i = 1; i <= totalDays; i++) {
+      days.push({
+        day: i,
+        isCurrentMonth: true,
+        date: new Date(year, month, i)
+      });
+    }
+
+    const remaining = 42 - days.length;
+    for (let i = 1; i <= remaining; i++) {
+      days.push({
+        day: i,
+        isCurrentMonth: false,
+        date: new Date(year, month + 1, i)
+      });
+    }
+
+    return days;
+  };
+
+  const changeMonth = (direction: 'prev' | 'next') => {
+    const newDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth() + (direction === 'next' ? 1 : -1), 1);
+    setCalendarDate(newDate);
+  };
+
+  const handleSelectDay = (dayDate: Date) => {
+    const d = String(dayDate.getDate()).padStart(2, '0');
+    const m = String(dayDate.getMonth() + 1).padStart(2, '0');
+    const y = dayDate.getFullYear();
+    const dateStr = `${d}/${m}/${y}`;
+    
+    if (activeDateField === 'start') {
+      setForm(prev => ({ ...prev, startDate: dateStr }));
+    } else if (activeDateField === 'end') {
+      setForm(prev => ({ ...prev, endDate: dateStr }));
+    }
+    setShowCalendar(false);
+    setActiveDateField(null);
+  };
+
   const handleSubmit = async () => {
     if (!form.type || !form.startDate || !form.endDate) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires (*)');
@@ -52,7 +126,6 @@ export default function CreatePermissionScreen() {
     }
   };
 
-
   const selectType = (type: string) => {
     setForm({ ...form, type });
     setShowTypeModal(false);
@@ -79,9 +152,18 @@ export default function CreatePermissionScreen() {
             style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}
             onPress={() => setShowTypeModal(true)}
           >
-            <Text style={[styles.selectText, { color: form.type ? themeColors.text : '#aaa' }]}>
-              {form.type || 'Sélectionner (Maladie, Annuel...)'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {form.type ? (
+                <View style={[styles.typeIconBg, { backgroundColor: getLeaveTypeDetails(form.type).color + '15', width: 28, height: 28, borderRadius: 8 }]}>
+                  <Ionicons name={getLeaveTypeDetails(form.type).icon as any} size={16} color={getLeaveTypeDetails(form.type).color} />
+                </View>
+              ) : (
+                <Ionicons name="alert-circle-outline" size={20} color="#888" />
+              )}
+              <Text style={[styles.selectText, { color: form.type ? themeColors.text : '#aaa', fontWeight: form.type ? '700' : '500' }]}>
+                {form.type || 'Sélectionner (Maladie, Annuel...)'}
+              </Text>
+            </View>
             <Ionicons name="chevron-down" size={20} color={themeColors.textSecondary} />
           </TouchableOpacity>
         </View>
@@ -89,30 +171,50 @@ export default function CreatePermissionScreen() {
         <View style={styles.row}>
           <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
             <Text style={[styles.label, { color: themeColors.textSecondary }]}>Début <Text style={styles.required}>*</Text></Text>
-            <View style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}>
-              <TextInput 
-                style={[styles.selectText, { color: themeColors.text, flex: 1 }]}
-                placeholder="JJ/MM/AAAA"
-                placeholderTextColor="#666"
-                value={form.startDate}
-                onChangeText={(t) => setForm({...form, startDate: t})}
-              />
+            <TouchableOpacity 
+              style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}
+              onPress={() => {
+                setActiveDateField('start');
+                setCalendarDate(form.startDate ? (() => {
+                  const parts = form.startDate.split('/');
+                  if (parts.length === 3) {
+                    const parsed = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                    if (!isNaN(parsed.getTime())) return parsed;
+                  }
+                  return new Date();
+                })() : new Date());
+                setShowCalendar(true);
+              }}
+            >
+              <Text style={[styles.selectText, { color: form.startDate ? themeColors.text : '#666', fontWeight: form.startDate ? '700' : '500' }]}>
+                {form.startDate || 'JJ/MM/AAAA'}
+              </Text>
               <Ionicons name="calendar-outline" size={18} color={themeColors.textSecondary} />
-            </View>
+            </TouchableOpacity>
           </View>
 
           <View style={[styles.inputGroup, { flex: 1 }]}>
             <Text style={[styles.label, { color: themeColors.textSecondary }]}>Fin <Text style={styles.required}>*</Text></Text>
-            <View style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}>
-               <TextInput 
-                style={[styles.selectText, { color: themeColors.text, flex: 1 }]}
-                placeholder="JJ/MM/AAAA"
-                placeholderTextColor="#666"
-                value={form.endDate}
-                onChangeText={(t) => setForm({...form, endDate: t})}
-              />
+            <TouchableOpacity 
+              style={[styles.selectBox, { borderColor: themeColors.border, backgroundColor: themeColors.cardBackground }]}
+              onPress={() => {
+                setActiveDateField('end');
+                setCalendarDate(form.endDate ? (() => {
+                  const parts = form.endDate.split('/');
+                  if (parts.length === 3) {
+                    const parsed = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                    if (!isNaN(parsed.getTime())) return parsed;
+                  }
+                  return new Date();
+                })() : new Date());
+                setShowCalendar(true);
+              }}
+            >
+              <Text style={[styles.selectText, { color: form.endDate ? themeColors.text : '#666', fontWeight: form.endDate ? '700' : '500' }]}>
+                {form.endDate || 'JJ/MM/AAAA'}
+              </Text>
               <Ionicons name="calendar-outline" size={18} color={themeColors.textSecondary} />
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -142,8 +244,6 @@ export default function CreatePermissionScreen() {
             <Text style={styles.submitBtnText}>Soumettre la demande</Text>
           )}
         </TouchableOpacity>
-
-
       </ScrollView>
 
       {/* Modal pour le type de congé */}
@@ -156,16 +256,97 @@ export default function CreatePermissionScreen() {
                 <Ionicons name="close" size={24} color={themeColors.text} />
               </TouchableOpacity>
             </View>
-            {LEAVE_TYPES.map((item, index) => (
-              <TouchableOpacity 
-                key={index} 
-                style={[styles.typeOption, index !== LEAVE_TYPES.length - 1 && { borderBottomWidth: 1, borderBottomColor: themeColors.border }]}
-                onPress={() => selectType(item)}
-              >
-                <Text style={[styles.typeOptionText, { color: themeColors.text }]}>{item}</Text>
-                {form.type === item && <Ionicons name="checkmark" size={20} color="#FFCC00" />}
+            {LEAVE_TYPES.map((item, index) => {
+              const typeInfo = getLeaveTypeDetails(item);
+              return (
+                <TouchableOpacity 
+                  key={index} 
+                  style={[styles.typeOption, index !== LEAVE_TYPES.length - 1 && { borderBottomWidth: 1, borderBottomColor: themeColors.border }]}
+                  onPress={() => selectType(item)}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={[styles.typeIconBg, { backgroundColor: typeInfo.color + '15', width: 34, height: 34, borderRadius: 10 }]}>
+                      <Ionicons name={typeInfo.icon as any} size={18} color={typeInfo.color} />
+                    </View>
+                    <Text style={[styles.typeOptionText, { color: themeColors.text }]}>{item}</Text>
+                  </View>
+                  {form.type === item && <Ionicons name="checkmark" size={20} color="#FFCC00" />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Calendrier Personnalisé */}
+      <Modal visible={showCalendar} animationType="fade" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.calendarContent, { backgroundColor: themeColors.cardBackground }]}>
+            {/* Header */}
+            <View style={styles.calendarHeader}>
+              <TouchableOpacity onPress={() => changeMonth('prev')} style={styles.calNavBtn}>
+                <Ionicons name="chevron-back" size={20} color={themeColors.text} />
               </TouchableOpacity>
-            ))}
+              <Text style={[styles.calendarTitle, { color: themeColors.text }]}>
+                {calendarDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+              </Text>
+              <TouchableOpacity onPress={() => changeMonth('next')} style={styles.calNavBtn}>
+                <Ionicons name="chevron-forward" size={20} color={themeColors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Weekdays */}
+            <View style={styles.weekdaysRow}>
+              {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map((w, idx) => (
+                <Text key={idx} style={styles.weekdayText}>{w}</Text>
+              ))}
+            </View>
+
+            {/* Days Grid */}
+            <View style={styles.daysGrid}>
+              {generateDaysOfMonth(calendarDate).map((dayObj, idx) => {
+                const targetStr = activeDateField === 'start' ? form.startDate : form.endDate;
+                const isSelected = targetStr && (() => {
+                  const parts = targetStr.split('/');
+                  if (parts.length === 3) {
+                    return dayObj.date.getDate() === parseInt(parts[0]) &&
+                           dayObj.date.getMonth() === parseInt(parts[1]) - 1 &&
+                           dayObj.date.getFullYear() === parseInt(parts[2]);
+                  }
+                  return false;
+                })();
+
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[
+                      styles.dayCell,
+                      !dayObj.isCurrentMonth && { opacity: 0.3 },
+                      isSelected && { backgroundColor: '#FFCC00', borderRadius: 12 }
+                    ]}
+                    onPress={() => dayObj.isCurrentMonth && handleSelectDay(dayObj.date)}
+                    disabled={!dayObj.isCurrentMonth}
+                  >
+                    <Text 
+                      style={[
+                        styles.dayText, 
+                        { color: isSelected ? '#000' : themeColors.text },
+                        isSelected && { fontWeight: '800' }
+                      ]}
+                    >
+                      {dayObj.day}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.calCloseBtn, { borderColor: themeColors.border }]} 
+              onPress={() => { setShowCalendar(false); setActiveDateField(null); }}
+            >
+              <Text style={[styles.calCloseBtnText, { color: themeColors.text }]}>Annuler</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -195,6 +376,81 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 18, fontWeight: '800' },
   typeOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 18 },
-  typeOptionText: { fontSize: 16, fontWeight: '500' }
+  typeOptionText: { fontSize: 16, fontWeight: '500' },
+  typeIconBg: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Custom calendar styles
+  calendarContent: {
+    borderTopLeftRadius: 35,
+    borderTopRightRadius: 35,
+    padding: 25,
+    paddingBottom: 40,
+    alignItems: 'center',
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 20,
+  },
+  calNavBtn: {
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+  },
+  calendarTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    textTransform: 'capitalize',
+  },
+  weekdaysRow: {
+    flexDirection: 'row',
+    width: '100%',
+    justifyContent: 'space-around',
+    marginBottom: 10,
+  },
+  weekdayText: {
+    width: 40,
+    textAlign: 'center',
+    fontSize: 12,
+    color: '#888',
+    fontWeight: '700',
+  },
+  daysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    width: '100%',
+    justifyContent: 'space-around',
+    marginBottom: 25,
+  },
+  dayCell: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  dayText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  calCloseBtn: {
+    borderWidth: 1,
+    height: 55,
+    borderRadius: 15,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  calCloseBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
 });
 
